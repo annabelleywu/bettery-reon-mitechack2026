@@ -1,6 +1,6 @@
 # Methodology (v2): what cell-level control is worth for a Massachusetts C&I battery
 
-MIT Energy & Climate Hack 2026 · REON challenge · updated Nov 7, 2026, 8:30 pm (v3: REON's string design and hard cell failures, after meeting REON's CTO)
+MIT Energy & Climate Hack 2026 · REON challenge · updated Nov 7, 2026, 10 pm (v4: 20-year service-horizon economics with replacements, NREL costs and O&M, customers, cell grades, scale-up)
 
 This document describes the full model behind the Cell Bypass Explorer web app (https://claude.ai/artifact/2uKjEAMjq2JzoyPa3ejHJd). It extends Annabelle's Methodology v1 (cell-aging calibration, series-string physics, fault model) with the kW metrics, lifetime optimization, chemistry-agnostic spread, cost of control, Massachusetts economics and environmental value. Every input is labelled **data** (fitted to public data), **derived** (our algebra from stated physics), **sourced** (a published figure, linked in the Sources table), **REON** (stated by REON) or **assumed** (a placeholder we chose).
 
@@ -14,33 +14,37 @@ This document describes the full model behind the Cell Bypass Explorer web app (
 
 **System.** Two REON EBS blocks (each 30 kW / 60 kWh, sodium-ion; REON slides) = 60 kW / 120 kWh, at an Eversource Greater Boston G-2 site, from 2027. Each block is one string of **250 cells with about 10% (25) as backup cells**, as REON's CTO described it on Nov 7. Both designs use the same cells; the fixed string has no switches, so all 250 run in series and the weakest decides.
 
-**Headline (team default: plain bypass on empty and on fault, no hard cell failures; Python, 2,000 paired packs):**
+**Headline (team default: plain bypass on empty and on fault, no hard cell failures; Python, 2,000 paired packs; money over a 20-year service horizon, Section 8):**
 
 | Metric | Fixed string | Cell-level control | Difference |
 |---|---|---|---|
-| Lifetime energy delivered (AC, per site; median) | 270 MWh | 303 MWh | **+12.1%** (mean over packs) |
-| Service life (to 70% of nameplate energy; mean) | 7.30 y | 8.07 y | **+10.6%** (per pack P10 +0.5 y, P90 +1.1 y) |
-| Year-1 net value per site | $25.3k | $25.5k | +0.6% |
-| Simple payback | 2.0 y | 2.1 y | +0.1 y |
-| NPV over service life (per site) | $74.7k | $84.2k | **+$9.1k** (P10 +$6.4k, P90 +$12.8k) |
-| CO₂ avoided over 20 y | — | — | 8.7 t (operation) + 2.5 t (cells not manufactured) |
-| Cells kept out of waste over 20 y | — | — | 221 kg (32 kWh) |
+| Lifetime energy per block (AC) | — | — | **+12.1%** (mean over packs) |
+| Service life per block (to 70% of nameplate energy; mean) | 7.30 y | 8.07 y | **+10.6%** |
+| Block-lifetimes used up over 20 years (per site) | 5.5 | 5.0 | −0.5 blocks (32 kWh of batteries not built) |
+| 20-year NPV per site (replacements, O&M, salvage included) | $69.5k | $73.8k | **+$4.3k** (P10 +$2.0k, P90 +$6.7k), after REON's +4% BMS cost |
+| Simple payback | 2.9 y | 3.0 y | +0.1 y |
+| CO₂ avoided over 20 y | — | — | 3.2 t (operation) + 2.5 t (cells not manufactured) |
 
-**With hard cell failures** (same rate for every cell; Section 10):
+**With hard cell failures** (same rate for every cell; Section 10), 20-year NPV gain per site:
 
-| Per-cell failure rate | Base system repairs (14-day outage, $1,500 visit) | Base system retires the block at its first failure |
+| Per-cell failure rate | Conventional block repaired (14-day outage, $1,500 visit) | Conventional block retired at its first failure |
 |---|---|---|
-| 100 ppm per year (our central case) | +12.1% energy, +$9.4k; 1.0 visits per site vs 0 | +20.6% energy; 16% of fixed blocks lost early |
-| 1,000 ppm per year (Tim's 0.1% example) | +11.7% energy, +$12.9k; 9.9 visits per site vs 0 | **+127% energy, +131% life (2.3×)**; 83% of fixed blocks lost early |
+| 100 ppm per year | +$5.1k; 1.0 repair visits per site vs 0 | +$10.7k; +20.6% energy; 16% of fixed blocks lost early |
+| 1,000 ppm per year (Tim's 0.1% example) | +$12.5k; 9.9 visits per site vs 0 | **+$86.6k; +127% energy, +131% life (2.3×)**; the conventional site buys 6.6 blocks per position over 20 years against 3.0 |
 
-For slides: about **+12% energy, +11% life, +$9k NPV per site** at the paper's cell spread, rising to **2–3× when single-cell failures end a conventional block** (REON's own comparison).
+**By customer** (same battery; 20-year NPV gain per site): neighborhood grocer on Eversource G-1's demand option (2 blocks) **+$4.7k**; mid-size business on G-2 (2 blocks) +$4.3k; cold-storage warehouse on G-3 (10 blocks) **+$20.7k**; National Grid G-2 site +$3.5k.
 
-**Five findings:**
-1. **REON's real string design roughly doubles the value we had.** With 25 backup cells in a 250-cell string, the gain is +12% energy and +$9.1k per site, against +6% and +$3.5k for our earlier guess of 4 backups in 96 cells. It clears REON's +4–6% cost overhead even at half the paper's cell spread (+6.0%, +$3.8k).
-2. **Single-point failure is where 2–3× comes from.** A conventional 250-cell string at 0.1% failures per cell-year has a 22% chance a year of a cell failure stopping it (92% over 10 years); REON's 25 backups make that about zero. If the owner retires a block at its first failure, REON delivers 2.3× the lifetime energy. If the owner repairs instead, REON avoids about 10 service visits per site. Per-cell failure rates have no public field number; we show 10, 100 and 1,000 ppm.
-3. **Value scales with cell-to-cell spread and with the number of backups.** Spread 2× gives +25% (+$17.9k), 3× +41% (+$25.5k); 5% early-knee cells +19%. Backups: 5 cells +5.9%, 12 +9.0%, 25 +12.1%, 50 +16.0%, every cell +26%.
-4. **Resting adds almost nothing once there are 25 backups** (+0.1 points of energy), so the headline is plain bypass. This matches REON's framing: it improves system life, not any cell's life.
-5. **Demand charges are two-thirds of the value**, so the utility territory matters most economically: on National Grid's G-2 rate the gain is +$5.0k per site.
+**Scale-up:** per 100 MW of C&I storage (about 1,670 two-block sites), +$7.2M NPV, +19.4 GWh delivered, 9.5 kt CO₂ avoided and 368 t of cells not manufactured over 20 years. For context, Massachusetts had about 222 MW enrolled in ConnectedSolutions in 2025 [S28].
+
+For slides: about **+12% energy and +11% life per battery, +$4k to +$5k per two-block site over 20 years (about $2k per block)**, rising to **2–3× energy and life, and tens of thousands of dollars, when single-cell failures end conventional blocks** (REON's own comparison).
+
+**Six findings:**
+1. **REON's string design (25 backup cells in 250) gives +12% energy and +11% life per battery**, against +6% for our earlier guess of 4 backups in 96 cells. Over 20 years that is +$4.3k per two-block site after paying REON's +4% BMS cost: positive but modest at the paper's cell spread.
+2. **Single-point failure is where 2–3× comes from.** A conventional 250-cell string at 0.1% failures per cell-year has a 22% chance a year of a cell failure stopping it (92% over 10 years); REON's 25 backups make that about zero. If the owner replaces a block at its first failure, REON delivers 2.3× the energy and saves +$87k per site over 20 years. If the owner repairs instead, REON avoids about 10 service visits per site. Per-cell failure rates have no public field number; we show 10, 100 and 1,000 ppm.
+3. **Value scales with cell-to-cell spread and with backups.** Spread 2× gives +25% energy (+$15.7k), 3× +41% (+$30.9k); 5% early-knee cells +19% (+$8.1k). At half the paper's spread the 20-year gain is about zero. Backups: 5 cells +$0.4k, 12 +$2.4k, 25 +$4.3k, 50 +$6.4k, every cell +$11.6k.
+4. **Cell grades.** REON built with cells 1.5× as uneven still beats a conventional battery with matched cells (+6% energy, +$0.6k); at 2× the energy is equal and cheaper cells must cover REON's BMS cost (a cell discount of roughly a third, since cells are about 10–12% of installed cost [S26]).
+5. **Switch resistance is the main technical risk.** 0.5 mΩ per switch (1.6% loss) cuts the 20-year gain to +$2.2k; 1 mΩ (3.2%) turns it negative (−$1.0k).
+6. **Resting adds nothing measurable once there are 25 backups**, so the headline is plain bypass, matching REON's framing that it improves system life, not cell life.
 
 ---
 
@@ -210,7 +214,7 @@ ConnectedSolutions Daily Dispatch pays $200 per kW-summer on average kW held ove
 ```latex
 \text{DC}_y = 12 \times \$33.95/\text{kW-month} \times 0.75 \times \min\!\big(30\,\text{kW},\; E/2\,\text{h}\big) \times A
 ```
-Eversource Greater Boston G-2: $20.21 distribution + $13.74 transmission per kW-month (Eversource's 2026 Summary of Eastern Massachusetts Electric Rates, effective Sep 1, 2026 [S22]; small businesses on G-1's demand option pay $41.65 and large ones on G-3 $30.05), billed on the monthly 15-minute peak [S7]. The 2-hour peak duration and 75% realization are assumed; replace them with a ComStock load profile [S8].
+Eversource Greater Boston G-2: $20.21 distribution + $13.74 transmission per kW-month (Eversource's 2026 Summary of Eastern Massachusetts Electric Rates, effective Sep 1, 2026 [S22]; small businesses on G-1's demand option pay $41.65 and large ones on G-3 $30.05), billed on the monthly 15-minute peak [S7]. The 2-hour peak duration and 50% realization (75% as a sensitivity) are assumed; replace them with a ComStock load profile [S8].
 
 ```latex
 \text{CPS}_y = 0.87 \times \text{ACP}_y \times 1.0 \times \frac{E}{1000} \times (365 - 45) \times A, \qquad \text{ACP} = \$65 \;(\le 2032),\; \$45 \;(> 2032)
@@ -225,9 +229,11 @@ Round-trip efficiency 88% is assumed; energy price from National Grid commercial
 ```latex
 \text{Capex} = \$600/\text{kWh} \times 60\,\text{kWh} \times (1 + \text{overhead}_\text{cell}) \times (1 - 0.30)
 ```
-Installed cost $600/kWh is assumed (installer data for small Massachusetts C&I: $500–800/kWh installed [S12]; at $350/kWh payback would be an implausible ~1.2 years). 30% investment tax credit: storage keeps it for projects beginning construction by 2033, subject to FEOC sourcing rules [S13, S14]; REON's cell origin is unknown.
+Installed cost $600/kWh is assumed for this 2-hour system (installer data for small Massachusetts C&I: $500–800/kWh installed [S12]; NREL ATB's bottom-up commercial 4-hour system was about $480/kWh in 2020 dollars, and shorter systems cost more per kWh [S25]). 30% investment tax credit: storage keeps it for projects beginning construction by 2033, subject to FEOC sourcing rules [S13, S14]; REON's cell origin is unknown.
 
-**NPV** = −Capex + Σ_y (CS + DC + CPS − Loss) / 1.08^(y+1) over each design's own service life. Operations and maintenance are omitted because they are the same for both designs. Results are medians over packs; the NPV difference is paired (same initial cells in both designs).
+**20-year service horizon (headline).** The owner needs storage for 20 years. When a block retires (capacity below 70% of nameplate or, in the 'retire' case, a hard fault), the owner buys a new block at that year's installed price, which falls along NREL's 2025 mid-case projection for 4-hour batteries (relative to 2024: 0.84 in 2030, 0.73 in 2035, 0.66 in 2040, 0.53 in 2050) [S23], and receives that year's ITC (30% for construction starting through 2033, 22.5% in 2034, 15% in 2035, none after) [S24]. Replacement block j of pack p behaves like simulated pack (p + 7919 j) mod P, so replacements are fresh, independent draws and both designs use the same mapping (paired). Fixed O&M is 2.5% of installed cost a year for both designs, NREL ATB's value for commercial battery storage [S25]. The block in service at year 20 is credited straight-line salvage. NPV = − Σ capex (discounted to purchase month) + Σ_y (CS + DC + CPS − losses − visits − O&M) / 1.08^(y+1) + salvage. NPV gains are means of each pack's paired difference, with P10 and P90. The earlier comparison over each design's own first life (no replacement, no O&M) is still reported as "own-life NPV". A hand-calculated test checks the horizon NPV (`tests/test_v3_faults.py`).
+
+**Realism.** Demand-charge capture is set to a conservative 50% of the theoretical saving (75% as a sensitivity), because the battery cannot cover every monthly peak. Still not included: interconnection and permitting, aggregator or software fees, and a ConnectedSolutions rate change after its 5-year lock. Massachusetts is among the best US markets for behind-the-meter storage (G-2 demand charges of $33.95/kW and ConnectedSolutions at $200/kW), so paybacks of about 3 years before those costs are plausible but optimistic; the REON-vs-conventional gain is much less sensitive to them than the absolute values.
 
 **Who sells this.** REON's PitchBook profile (Sep 2026) describes it as a C&I energy platform: storage systems, microgrids, energy-management software, DER aggregation, optimisation and dispatch for virtual power plants, and financing [S21]. So REON can plausibly act as the ConnectedSolutions aggregator and finance the system itself. Confirm with REON which of these it offers in Massachusetts today.
 
@@ -265,7 +271,7 @@ The paper's data has no sudden failures, so the headline runs without them. REON
 |---|---|---|
 | Lifetime energy gain | +12.3% | +12.1% |
 | Service life gain | +10.7% | +10.6% |
-| NPV gain per site | +$9.4k | +$9.1k |
+| 20-year NPV gain per site | +$4.37k | +$4.34k |
 | 1,000 ppm failures, base block retired: energy gain | +135% (200 packs) | +127% (1,000 packs) |
 
   The remaining difference is Monte Carlo noise. In v2 the two versions also differed on resting (Python ranks cells from the raw 1%-noise capacity reading; the browser fuses all signals); resting is now off by default, so this no longer affects the headline.
@@ -293,72 +299,70 @@ The model matches the held-out fleet data within about 10–20% up to 300k km an
 
 ---
 
-## 13. Results (Python; team default 2,000 packs, sweeps 600, fault cases 1,000; per site = 2 blocks; NPV gain paired)
+## 13. Results (Python; team default 2,000 packs, sweeps 600, fault cases 1,000; per site = 2 blocks)
 
-Source: `outputs/value_summary.md`. Energy and life gains are means over paired packs. 250 cells per string, 25 backups, plain bypass, no hard failures unless stated.
+Source: `outputs/value_summary.md`. Energy and life gains are means over paired packs; money is the 20-year NPV gain per site (mean of paired differences, P10 and P90), with the own-life NPV gain for comparison. 250 cells per string, 25 backups, plain bypass, no hard failures unless stated.
 
 **Backup cells k** (of 250):
 
-| k | Energy gain | Life gain | NPV gain per site (P10, P90) |
+| k | Energy gain | Life gain | 20-y NPV gain (P10, P90) | Own-life NPV gain |
+|---|---|---|---|---|
+| 0 (switch hardware, unused) | −0.8% | −0.4% | −$4.6k | −$2.5k |
+| 5 | +5.9% | +5.3% | +$0.4k (−$1.9k, +$2.4k) | +$2.0k |
+| 12 | +9.0% | +8.0% | +$2.4k | +$4.3k |
+| **25 (REON, 10%)** | **+12.1%** | **+10.6%** | **+$4.3k (+$2.0k, +$6.7k)** | +$6.6k |
+| 50 | +16.0% | +14.0% | +$6.4k | +$9.3k |
+| 125 | +21.9% | +19.0% | +$9.5k | +$13.4k |
+| 249 (every cell to its own end) | +26.3% | +22.8% | +$11.6k | +$16.4k |
+| Previous setup: 96 cells, k = 4 | +6.2% | +5.6% | +$0.4k | +$2.3k |
+
+**Cell spread and cell grades:**
+
+| Case | Energy gain | Life gain | 20-y NPV gain |
 |---|---|---|---|
-| 0 (switch hardware, unused) | −0.8% | −0.4% | −$2.7k |
-| 5 | +5.9% | +5.3% | +$3.2k |
-| 12 | +9.0% | +8.0% | +$6.2k |
-| **25 (REON, 10%)** | **+12.1%** | **+10.6%** | **+$9.1k (+$6.4k, +$12.8k)** |
-| 50 | +16.0% | +14.0% | +$12.7k |
-| 125 | +21.9% | +19.0% | +$17.9k |
-| 249 (every cell to its own end) | +26.3% | +22.8% | +$21.9k |
-| Previous setup: 96 cells, k = 4 | +6.2% | +5.6% | +$3.5k |
+| 0.5× the paper's spread | +6.0% | +5.5% | −$0.1k |
+| 1× (paper's cells) | +12.1% | +10.6% | +$4.3k |
+| 2× | +25.0% | +21.2% | +$15.7k |
+| 3× | +41.2% | +35.6% | +$30.9k |
+| 5% early-knee outliers | +19.0% | +17.5% | +$8.1k |
+| REON with 1.5× spread vs conventional with the paper's cells | +6.3% | +5.7% | +$0.6k |
+| REON with 2× spread vs conventional with the paper's cells | +0.8% | +1.1% | −$3.5k (same cell price) |
+| REON with 2.5× spread vs conventional with the paper's cells | −4.3% | −3.1% | −$7.7k (same cell price) |
 
-**Cell spread:**
+**Customers** (same battery): grocer on Eversource G-1 demand option ($41.65/kW, 2 blocks) +$4.7k (P10 +$2.3k, P90 +$7.2k); mid-size business on G-2 (2 blocks) +$4.3k; cold-storage warehouse on G-3 ($30.05/kW, 10 blocks) +$20.7k (+$9.0k, +$32.7k); mid-size business on National Grid G-2 ($15.06/kW) +$3.5k.
 
-| Case | Energy gain | Life gain | NPV gain per site |
-|---|---|---|---|
-| 0.5× the paper's spread | +6.0% | +5.5% | +$3.8k |
-| 1× (paper's cells) | +12.1% | +10.6% | +$9.1k |
-| 2× | +25.0% | +21.2% | +$17.9k |
-| 3× | +41.2% | +35.6% | +$25.5k |
-| 5% early-knee outliers | +19.0% | +17.5% | +$14.5k |
+**Hard cell failures:**
 
-**Resting** (adds little with 25 backups):
-
-| Case | Energy gain | Life gain | NPV gain per site |
-|---|---|---|---|
-| Plain bypass (default) | +12.1% | +10.6% | +$9.1k |
-| + resting 2 cells before the knee | +12.2% | +11.4% | +$9.0k |
-| Cycle-dominated aging | +10.9% | +9.9% | +$6.4k |
-| Cycle-dominated aging + resting | +11.8% | +11.5% | +$7.0k |
-
-**Hard cell failures** (same rate for every cell):
-
-| Per-cell rate, owner response | Energy gain | Life gain | Fixed blocks lost early | Visits per site (fixed / REON) | NPV gain per site (P10, P90) |
-|---|---|---|---|---|---|
-| 10 ppm, repair | +12.2% | +10.6% | 0% | 0.1 / 0 | +$9.1k |
-| 10 ppm, retire | +12.9% | +11.4% | 1% | — | +$9.1k |
-| 100 ppm, repair | +12.1% | +10.5% | 0% | 1.0 / 0 | +$9.4k |
-| 100 ppm, retire | +20.6% | +19.3% | 16% | — | +$9.7k (+$6.4k, +$36.9k) |
-| 1,000 ppm, repair | +11.7% | +9.3% | 0% | 9.9 / 0 | +$12.9k |
-| 1,000 ppm, retire | **+126.5%** | **+130.6%** | 83% | — | +$71.1k (+$9.1k, +$121.1k) |
-
-The retire rows' NPV compares each design over its own life; a fixed block lost in year 3 earns three years of revenue. A fairer money comparison for those rows counts the replacement block the owner then buys (not yet built).
+| Per-cell rate, owner response | Energy gain | Life gain | Fixed blocks lost early | Visits per site (fixed / REON) | Blocks per position over 20 y (fixed / REON) | 20-y NPV gain (P10, P90) |
+|---|---|---|---|---|---|---|
+| 10 ppm, repair | +12.2% | +10.6% | 0% | 0.1 / 0 | 3.06 / 3.00 | +$4.5k |
+| 10 ppm, retire | +12.9% | +11.4% | 1% | — | 3.09 / 3.00 | +$5.0k |
+| 100 ppm, repair | +12.1% | +10.5% | 0% | 1.0 / 0 | 3.06 / 3.00 | +$5.1k |
+| 100 ppm, retire | +20.6% | +19.3% | 16% | — | 3.37 / 3.00 | +$10.7k (+$2.6k, +$26.8k) |
+| 1,000 ppm, repair | +11.7% | +9.3% | 0% | 9.9 / 0 | 3.06 / 3.00 | +$12.5k |
+| 1,000 ppm, retire | **+126.5%** | **+130.6%** | 83% | — | 6.57 / 3.00 | **+$86.6k (+$28.2k, +$150.9k)** |
 
 Chance that a cell failure stops a 250-cell block: fixed string 2.5% / 22% / 92% over 10 years at 10 / 100 / 1,000 ppm; with 25 backups, about 0 in every case.
 
 ---
 
-## 14. Sensitivity of the NPV gain (per site, no hard failures)
+## 14. Sensitivity of the 20-year NPV gain (per site, no hard failures)
 
-| Change from default | NPV gain | Note |
+| Change from default | 20-y NPV gain | Note |
 |---|---|---|
-| Default | +$9.1k | |
-| BMS overhead 6% (instead of 4%) | +$8.3k | |
-| Switch loss 1.6% (0.5 mΩ at 100 A) instead of 0.5% | +$7.1k | 1 mΩ (3.2% loss): about +$4.1k (browser, 300 packs) |
-| National Grid G-2 ($15.06/kW-month) | +$5.0k | |
-| No ITC (cells fail the FEOC test) | +$8.4k | Payback lengthens for both designs |
-| Retire at 80% instead of 70% | +$8.3k | |
-| Retention vs own beginning of life (R_sys) | +$9.4k | |
+| Default | +$4.3k | |
+| Switch loss 1.6% (0.5 mΩ at 100 A) | +$2.2k | |
+| Switch loss 3.2% (1 mΩ at 100 A) | −$1.0k | Switch resistance is the main technical risk |
+| BMS overhead 6% (instead of 4%) | +$2.6k | |
+| Demand-charge capture 75% (instead of 50%) | +$5.1k | |
+| Installed cost $800/kWh | +$4.9k | |
+| No ITC (cells fail the FEOC test) | +$5.9k | Fewer replacements matter more without the credit |
+| Horizon 15 years | +$3.5k | |
+| Retire at 80% instead of 70% | +$5.6k | |
+| Slower calendar aging (knee about 10 y, life 11.4 y) | +$4.2k | REON's 20,000-cycle cells: same % gains |
+| Cycle-dominated aging | +$7.0k | |
 
-Order of influence on the gain: hard-failure response and backup count, then cell spread, then utility rate, switch loss and overhead.
+Order of influence: hard-failure response, backup count and cell spread (largest), then switch loss, overhead and utility rate.
 
 ---
 
@@ -372,10 +376,11 @@ Order of influence on the gain: hard-failure response and backup count, then cel
 6. **Static temperatures**, which make temperature resting effectively permanent.
 7. **Economics are first-order**: no hourly dispatch optimization, demand-charge realization and peak duration are assumed, and ConnectedSolutions and Clean Peak are not stacked in the same hour. A ComStock load profile and PVWatts solar would replace the assumptions.
 8. **Rates change**: ConnectedSolutions has no published program year in the materials found; Clean Peak rules changed in May 2026.
-9. **Monte Carlo noise.** Python at 3,000 packs is the reference; the browser's 48-pack default reads about 1 point high.
+9. **Monte Carlo noise.** Python at 2,000 packs is the reference; the browser's 48-pack default reads about 1 point high.
 10. **Sensing model.** Resting depends on how accurately the BMS measures each cell's capacity; the two implementations differ here by about $0.4k (Section 11). REON's sensing accuracy is not yet known.
-12. **No public per-cell failure rate.** The fault results are shown at 10, 100 and 1,000 ppm per cell-year; which applies to REON's NFPP cells is a question for REON or its cell supplier.
 11. **No SOC imbalance.** The paper finds it costs under 2% (βSOC above 0.98); REON's per-cell control could recover some of it, which is not counted.
+12. **No public per-cell failure rate.** The fault results are shown at 10, 100 and 1,000 ppm per cell-year; which applies to REON's NFPP cells is a question for REON or its cell supplier.
+13. **Economics leave out** interconnection, permitting, aggregator and software fees, and assume ConnectedSolutions pays $200/kW-summer for 20 years (rates are locked for 5).
 
 ---
 
@@ -400,7 +405,8 @@ Order of influence on the gain: hard-failure response and backup count, then cel
 | Retirement | 70% of nameplate | Brief | 80% as sensitivity |
 | ConnectedSolutions | $200/kW-summer, 3 h, 45 event days | Sourced | [S3] |
 | Demand charge | $33.95/kW-month | Sourced | [S5][S6] |
-| Peak duration, realization | 2 h, 75% | Assumed | Replace with ComStock |
+| Peak duration, realization | 2 h, 50% (75% sensitivity) | Assumed | Replace with ComStock |
+| Fixed O&M; replacement price path; ITC schedule | 2.5% of installed cost a year; NREL 2025 mid case; 30% to 2033, 22.5% 2034, 15% 2035 | Sourced | S23–S25 |
 | Clean Peak | 87% × ACP ($65 / $45), 1.0× | Sourced | [S9][S10] |
 | Energy price | $0.20/kWh | Sourced | [S11] |
 | Round-trip / inverter efficiency | 88% / 96% | Assumed | Ask REON |
@@ -438,6 +444,13 @@ Order of influence on the gain: hard-failure response and backup count, then cel
 | S18 | REON one-pager "Who We Are" (provided) | — |
 | S19 | REON CTO Tim Ren, hack Discord, Nov 6–7, 2026 | Not public |
 | S20 | Methodology v1 (Annabelle) and repo annabelleywu/mitec2026 | https://github.com/annabelleywu/mitec2026 |
+| S23 | Cole, Ramasamy and Turan, *Cost Projections for Utility-Scale Battery Storage: 2025 Update*, NREL/TP-6A40-93281 (mid case, normalized to 2024) | https://docs.nrel.gov/docs/fy25osti/93281.pdf |
+| S24 | National Law Review on the OBBBA: storage credit 100% if construction begins by end-2033, 75% in 2034, 50% in 2035, 0% after | https://natlawreview.com/article/congress-phases-out-energy-tax-credits |
+| S25 | NREL Annual Technology Baseline, Commercial Battery Storage (fixed O&M 2.5% of capital cost; 2021 bottom-up costs) | https://atb.nrel.gov/electricity/2024/commercial_battery_storage |
+| S26 | BloombergNEF via Energy-Storage.news: 2025 stationary-storage pack $70/kWh, average cell $74/kWh | https://www.energy-storage.news/li-ion-battery-pack-prices-fell-8-since-last-year-despite-metals-prices-rising-bloombergnef-says/ |
+| S27 | Benchmark Mineral Intelligence: LFP cells for BESS trade at a 10–15% discount to EV-grade cells | https://source.benchmarkminerals.com/article/benchmark-launches-314ah-lfp-bess-price-amid-global-storage-market-surge |
+| S28 | Mass. DOER Commissioner Mahony, NASEO 2026 Energy Policy Outlook (ConnectedSolutions enrolled 217.59 MW in 2024, 221.85 MW in 2025; 425 MW / 838 MWh existing storage) | https://energyoutlook2026.naseo.org/data/energymeetings/presentations/Elizabeth%20Mahony.pdf |
+| S29 | Applied Economics Clinic for Clean Energy Group, *ConnectedSolutions: A Program Assessment for Massachusetts* (2020: 286 MW of C&I capacity, all batteries) | https://www.cesa.org/wp-content/uploads/ConnectedSolutions-An-Assessment-for-Massachusetts.pdf |
 | S22 | Eversource, 2026 Summary of Eastern Massachusetts Electric Rates (effective Sep 1, 2026) | https://www.eversource.com/docs/default-source/rates-tariffs/ema-greater-boston-rates.pdf?sfvrsn=c27ef362_36 |
 | S21 | PitchBook, REON Technology private company profile (generated Nov 7, 2026; last updated Sep 30, 2026) | Licensed (MIT access), not public |
 
