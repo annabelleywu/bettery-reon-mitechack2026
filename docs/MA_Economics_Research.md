@@ -64,7 +64,7 @@ MIT Energy & Climate Hack 2026 · researched Nov 7, 2026 · every number links t
 | Utility / rate | Demand charge | Date | Source |
 |---|---|---|---|
 | Eversource Greater Boston G-2 | $18.53 distribution + $12.81 transmission ≈ **$31/kW-month** | 2024 | [S14] Official |
-| Eversource Greater Boston G-2 | $20.21 + $13.74 = **$33.95/kW-month** | Jul 2026 | [S15] Installer citing official summary |
+| Eversource Greater Boston G-2 | $20.21 + $13.74 = **$33.95/kW-month** | Eff. Sep 1, 2026 | Confirmed in Eversource's own 2026 Summary of Eastern MA Electric Rates (https://www.eversource.com/docs/default-source/rates-tariffs/ema-greater-boston-rates.pdf?sfvrsn=c27ef362_36); G-1 demand option $22.31 + $19.34 = $41.65; G-3 $15.97 + $14.08 = $30.05 |
 | National Grid G-2 | **$15.06/kW-month** (transmission billed per kWh instead) | 2026 | [S15] Installer |
 
 - G-2 bills on the greatest **15-minute peak** each month. [S16] Aggregator

@@ -210,7 +210,7 @@ ConnectedSolutions Daily Dispatch pays $200 per kW-summer on average kW held ove
 ```latex
 \text{DC}_y = 12 \times \$33.95/\text{kW-month} \times 0.75 \times \min\!\big(30\,\text{kW},\; E/2\,\text{h}\big) \times A
 ```
-Eversource Greater Boston G-2: $20.21 distribution + $13.74 transmission per kW-month (July 2026, via installer calculator [S5]; 2024 official summary $31.34 [S6]), billed on the monthly 15-minute peak [S7]. The 2-hour peak duration and 75% realization are assumed; replace them with a ComStock load profile [S8].
+Eversource Greater Boston G-2: $20.21 distribution + $13.74 transmission per kW-month (Eversource's 2026 Summary of Eastern Massachusetts Electric Rates, effective Sep 1, 2026 [S22]; small businesses on G-1's demand option pay $41.65 and large ones on G-3 $30.05), billed on the monthly 15-minute peak [S7]. The 2-hour peak duration and 75% realization are assumed; replace them with a ComStock load profile [S8].
 
 ```latex
 \text{CPS}_y = 0.87 \times \text{ACP}_y \times 1.0 \times \frac{E}{1000} \times (365 - 45) \times A, \qquad \text{ACP} = \$65 \;(\le 2032),\; \$45 \;(> 2032)
@@ -438,6 +438,7 @@ Order of influence on the gain: hard-failure response and backup count, then cel
 | S18 | REON one-pager "Who We Are" (provided) | — |
 | S19 | REON CTO Tim Ren, hack Discord, Nov 6–7, 2026 | Not public |
 | S20 | Methodology v1 (Annabelle) and repo annabelleywu/mitec2026 | https://github.com/annabelleywu/mitec2026 |
+| S22 | Eversource, 2026 Summary of Eastern Massachusetts Electric Rates (effective Sep 1, 2026) | https://www.eversource.com/docs/default-source/rates-tariffs/ema-greater-boston-rates.pdf?sfvrsn=c27ef362_36 |
 | S21 | PitchBook, REON Technology private company profile (generated Nov 7, 2026; last updated Sep 30, 2026) | Licensed (MIT access), not public |
 
 Fuller Massachusetts market research with 42 sources: `MA_Economics_Research.md`.

@@ -34,7 +34,7 @@ class EconConfig:
     cs_rate: float = 200.0               # $/kW-summer, ConnectedSolutions Daily Dispatch
     cs_event_hours: float = 3.0          # events are 2-3 h; 3 h is conservative
     cs_event_days: int = 45              # 30-60 events per summer
-    dc_rate: float = 33.95               # $/kW-month, Eversource Greater Boston G-2 (Jul 2026); National Grid G-2: 15.06
+    dc_rate: float = 33.95               # $/kW-month, Eversource Greater Boston G-2 (rate summary eff. Sep 1, 2026); National Grid G-2: 15.06
     dc_hours: float = 2.0                # placeholder: duration of the site's monthly peak
     dc_realization: float = 0.75         # placeholder: share of theoretical demand savings realized
     cps_clear: float = 0.87              # CPECs clear ~87% of ACP (Modo Energy)

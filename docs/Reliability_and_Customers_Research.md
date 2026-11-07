@@ -1,6 +1,6 @@
 # Reliability, outage cost and Massachusetts C&I customers: research for the v3 model
 
-MIT Energy & Climate Hack 2026 · REON challenge · Nov 7, 2026, evening
+MIT Energy & Climate Hack 2026 · REON challenge · Nov 7, 2026, evening (sources audited 6 pm: weak and vendor sources removed or labelled; Eversource rates checked against Eversource's own summary)
 
 Why this file exists: after meeting Tim Ren (REON CTO), we are adding the single-point-of-failure effect to the model. In a conventional series string one failed cell stops every cell; REON keeps about 10% of the cells as backups and switches a failed cell out. This file gathers the public data behind the new inputs and the customer context. Every number has a source in the table at the end (R1–R20); where no good public number exists we say so and give a range.
 
@@ -54,20 +54,32 @@ Two cases bracket reality, and the model now runs both:
 ## 4. Massachusetts grid reliability and outage cost
 
 - **Massachusetts is reliable by US standards.** EIA 2025: the average customer saw 121 minutes of outage over 0.906 interruptions (133.6 minutes each) including major events; 75 minutes and 0.74 interruptions without them. US average: 262.6 minutes, 1.34 interruptions [R11]. So backup power is worth less in Massachusetts than in the Southeast, and the case leans on bill savings.
-- **Outage cost to businesses.** ORNL, using LBNL's Interruption Cost Estimate (ICE) calculator: C&I customers lost an average of $6,031 in 2024; major outages lengthened from 9.6 to 11.8 hours between 2018 and 2024 [R12]. LBNL rebuilt the calculator (ICE 2.0) in 2025 from 2022–2024 surveys in 24 utility territories [R13, R14]; it gives cost per event by duration and customer class and is the right tool for a site-specific number.
-- **Small businesses.** Generator-industry figures for lost sales per hour (vendor source, likely high): convenience store $556 (50 kW typical load), high-volume restaurant $881 (150 kW), pharmacy $1,750, supermarket $4,388 [R15]. A Colorado grocery lost about $35,000 over a 24-hour outage, about $1,460 per hour [R16].
+- **Outage cost to businesses.** LBNL's updated Interruption Cost Estimate model (ICE 2.0, Phase 1 report 2025; surveys 2022–2024 in 24 mostly Eastern and Midwestern utility territories) gives an average non-residential cost per event, in 2023 dollars, of $609 for a momentary interruption, $2,839 for 2 hours, $6,172 for 8 hours and $12,646 for 24 hours (ES Table 3) [R13]. The report combines small, medium and large businesses in one model, so a small grocer's cost is likely below these averages and a cold store's above. At Massachusetts' 0.9 interruptions a year of about 2 hours each, that is roughly $2,500 a year for an average business (our arithmetic). LBNL's free online calculator gives a site-specific number.
+- Dropped in this audit: a single national ORNL figure ($6,031 per C&I customer in 2024) whose basis (per outage or per year) the press release does not state; generator-vendor "lost sales per hour" figures; and a one-store anecdote from Colorado.
 - **Massachusetts funds resilience.** DOER's Advancing Massachusetts Power program awarded more than $40 million to 36 projects on Sep 18, 2026, including behind-the-meter storage for backup at critical facilities [R17]. This is a possible co-funding route for REON systems at community sites.
 
 ## 5. Customers that fit: cold storage and small businesses
 
 **Cold storage (for example Americold).**
-- Americold runs five Massachusetts warehouses: Boston, Taunton, two in Gloucester, and Middleborough (built for Ocean Spray), almost 19 million cubic feet in total [R18].
+- Americold's own site lists Massachusetts warehouses in Gloucester (Rogers St. and Rowe Square), Taunton and Middleborough [R22]. When Middleborough opened in 2018 (built for Ocean Spray), Americold had five Massachusetts sites including Boston, almost 19 million cubic feet in total [R18]; we have not confirmed that the Boston site still operates.
 - Americold sites already took part in an Eversource demand-management program using thermal storage from Viking Cold, alongside Sysco and the Greater Boston Food Bank [R19]. Massachusetts cold-storage operators are therefore already paying to cut peaks.
-- Demand charges are 30–50% of a cold-storage bill, and refrigeration compressors use 70–80% of the electricity (industry blog citing EIA CBECS; treat as indicative) [R20].
+- Demand charges are often quoted as 30–50% of a cold-storage bill, with refrigeration compressors using 70–80% of the electricity (vendor blog citing others; indicative only) [R20].
 - Americold says its buildings hold temperature for up to a week without power [R21], so for them the value is demand charges and grid programs, not backup.
 - Size: a large cold store peaks at hundreds of kW, so it would use several EBS blocks; our 2-block site is closer to a small cold store, food distributor or grocery.
 
 **Small businesses ("mom and pop").** Tim pointed to suburban sites where space matters. Convenience stores, restaurants and small grocers have refrigeration loads (spoilage risk in outages) and pay demand charges on G-2-type rates. These are the sites a 60 kW / 120 kWh system fits.
+
+## 5b. Which Eversource rate each customer pays (checked against Eversource's own summary)
+
+Eversource's 2026 Summary of Eastern Massachusetts Electric Rates, effective Sep 1, 2026 [R23], per kW of monthly peak demand:
+
+| Rate | Who | Distribution + transmission demand charge |
+|---|---|---|
+| G-1, demand price option | Small businesses averaging up to 100 kW (charged on kW above 10 kW) | $22.31 + $19.34 = **$41.65/kW** |
+| **G-2 (our default)** | Medium general service | $20.21 + $13.74 = **$33.95/kW** (confirmed) |
+| G-3 | Large general service (large cold stores) | $15.97 + $14.08 = **$30.05/kW** (plus an optional coincident-peak transmission charge) |
+
+So a small grocer on G-1's demand option would see a higher value per kW than our default, and a large cold store on G-3 slightly lower.
 
 ## 6. What changes in the model (v3)
 
@@ -91,17 +103,19 @@ Two cases bracket reality, and the model now runs both:
 | R6 | EPRI, Risk Factors and Failure Statistics of Lithium-Ion BESS (Oct 2026) | https://restservice.epri.com/publicdownload/000000003002034920/0/Product |
 | R7 | Utility Dive on the EPRI report (0.04–0.14% per year) | https://www.utilitydive.com/news/battery-system-failures-fell-98-in-7-years-but-older-systems-need-special/832882/ |
 | R8 | pv magazine USA on the EPRI report (0.04 per GWh in 2025) | https://pv-magazine-usa.com/2026/10/14/battery-energy-storage-failures-are-down-98-since-2018-and-continue-to-decline/ |
-| R9 | Fronius, value of field serviceability (truck roll $250+) | https://fronius.com/en-us/usa/solar-energy/installers-partners/info-center/blog/the-value-of-field-serviceability-12-17-2021 |
+| R9 | Fronius, value of field serviceability (truck roll $250+; 2021 solar-inverter vendor blog, context only) | https://fronius.com/en-us/usa/solar-energy/installers-partners/info-center/blog/the-value-of-field-serviceability-12-17-2021 |
 | R10 | US patent 12,015,171 (module replacement and balancing in an aged pack) | https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/12015171 |
 | R11 | EIA Electric Power Annual, Table 11.3, reliability by state (2025, 2024) | https://www.eia.gov/electricity/annual/html/epa_11_03.html |
-| R12 | ORNL via EurekAlert, "Power outages cost US electricity customers billions" | https://www.eurekalert.org/news-releases/1118431 |
-| R13 | LBNL, ICE Calculator 2.0 Phase 1 final report (Jun 2025) | https://emp.lbl.gov/publications/ice-calculator-20-final-report-phase |
+| R12 | (dropped in audit) | — |
+| R13 | LBNL, ICE Calculator 2.0 Phase 1 final report (2025), ES Table 3 | https://www.osti.gov/servlets/purl/2569414 |
 | R14 | LBNL, ICE 2.0 survey basis (24 territories, 2022–2024) | https://eta-publications.lbl.gov/bibcite/export/bibtex/bibcite_reference/36587 |
-| R15 | Generac light-commercial brochure (lost sales per hour; vendor source) | https://punchout.acklandsgrainger.com/ec/pdf/5EMC3_1.pdf |
-| R16 | American Experiment, Niwot Market outage cost | https://www.americanexperiment.org/?p=103015 |
+| R15 | (dropped in audit) | — |
+| R16 | (dropped in audit) | — |
 | R17 | Mass.gov, AMP energy storage grants, Sep 18, 2026 | https://www.mass.gov/news/healey-driscoll-administration-awards-more-than-40-million-to-power-critical-facilities-during-outages |
 | R18 | Fleet Owner, Americold Middleborough opening (five MA sites) | https://fleetowner.com/refrigerated-transporter/cold-storage-logistics/article/21231791/americold-ocean-spray-open-new-facility-in-middleborough-ma |
 | R19 | RefIndustry, Viking Cold / Eversource project (Americold, Sysco, Greater Boston Food Bank) | https://refindustry.com/news/cold-chain/viking-cold-named-platinum-winner-of-cleanie-award-s-project-of-the-year/whatsapp:/send |
-| R20 | Envigilance, cold storage demand charges (citing Inertia Resources, EIA CBECS) | https://envigilance.com/blog/cold-storage-demand-charges/ |
+| R20 | Envigilance, cold storage demand charges (vendor blog citing Inertia Resources, EIA CBECS; indicative) | https://envigilance.com/blog/cold-storage-demand-charges/ |
 | R21 | FreightWaves, Americold's outage resilience | https://www.freightwaves.com/news/americolds-secret-to-surviving-power-outages |
+| R22 | Americold, Gloucester (Rogers St.) facility page, listing nearby Massachusetts sites | https://www.americold.com/gloucester-rogers-st-ma-americold-logistics-gloucester-ma/ |
+| R23 | Eversource, 2026 Summary of Eastern Massachusetts Electric Rates (effective Sep 1, 2026) | https://www.eversource.com/docs/default-source/rates-tariffs/ema-greater-boston-rates.pdf?sfvrsn=c27ef362_36 |
 | — | Tim Ren (REON CTO), in person and hack Discord, Nov 7, 2026 | Not public |
