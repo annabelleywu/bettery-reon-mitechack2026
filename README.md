@@ -9,7 +9,7 @@ MIT Energy & Climate Hack 2026, REON challenge. This repo estimates what per-cel
 pip install -r requirements.txt
 ./scripts/fetch_paper_data.sh   # optional: paper source data (MIT licence) into data/paper/
 python scripts/calibrate.py     # optional: refit data/calibration_zhou2026.json, validation report
-python -m pytest -q             # 30 tests (2 need the paper data)
+python -m pytest -q             # 41 tests (2 need the paper data)
 python scripts/run_demo.py      # writes outputs/summary.md and figures
 ```
 
@@ -113,12 +113,26 @@ The k = 95 bound agrees with the paper: weakest-to-average life ratio βlife ≈
 
 ![headroom](outputs/value_vs_headroom.png)
 
+## 4. The brief's given capabilities, as adjustable inputs
+
+The brief says teams may assume (1) individual-cell monitoring of voltage, temperature, SOC, SOH, capacity, resistance, open-circuit voltage and performance history, and (2) switching and selective bypass, chosen by us, subject to system limits. Both are parameters here:
+
+| brief capability | where | what you can change |
+|---|---|---|
+| per-cell monitoring | `MonitoringConfig` (`reon_model/monitoring.py`) | each signal on/off and its measurement noise; `MonitoringConfig.only("voltage", "temperature")` gives a conventional-BMS view; `.perfect()` gives noise-free readings |
+| switching and bypass | `ControlPolicy` (`reon_model/control.py`) | bypass on empty, bypass on fault, isolate when a measured feature or the learned fault risk crosses a threshold, rest the weakest cells each month, spare slots kept for faults |
+| system limit | `PackConfig.bypass_headroom` | k = cells the voltage window lets out of the string at once |
+
+The controller and the learned model see only measured signals. Aging and the true fault hazard run on the true cell state. Cycle aging follows each cell's own charge throughput, so bypassing or resting a cell has a real cost and benefit. With every cell fully used it reduces exactly to the calibrated closed form (tested). `ControlPolicy.conventional()` on bypass hardware reproduces the fixed string exactly (tested).
+
 ## Layout
 
 ```
 reon_model/nhpp.py             Poisson / NHPP primitives (piecewise, Crow-AMSAA, log-linear, pack survival)
 reon_model/intensity_model.py  Poisson-GLM intensity learner, LRT vs homogeneous, GBM challenger
 reon_model/simulate.py         aging + fault Monte Carlo, fixed vs bypass, telemetry rows for training
+reon_model/monitoring.py       adjustable per-cell signals and noise
+reon_model/control.py          adjustable bypass / isolate / rest policy
 reon_model/calibration.py      hinge fits, knee spread, validation against Zhou et al. (2026)
 data/calibration_zhou2026.json fitted aging parameters (committed; raw paper data is not)
 scripts/fetch_paper_data.sh    download the paper source data

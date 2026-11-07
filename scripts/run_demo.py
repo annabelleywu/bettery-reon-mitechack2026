@@ -16,7 +16,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from reon_model import (  # noqa: E402
-    FEATURES, AgingConfig, HazardConfig, PackConfig, PoissonIntensityGLM, bypass_survival, compare,
+    FEATURES, AgingConfig, ControlPolicy, HazardConfig, MonitoringConfig, PackConfig, PoissonIntensityGLM,
+    bypass_survival, compare,
     fit_gradient_boosted_intensity, fixed_string_survival, poisson_deviance, simulate,
 )
 
@@ -46,8 +47,9 @@ def main():
     # with a known ground-truth hazard so we can check the learner).
     fleet = simulate("bypass", n_packs=120, pack=PackConfig(years=10.0), hazard=truth,
                      seed=11, record_rows=True)
-    train, test = train_test_split_by_pack(fleet.rows)
-    glm = PoissonIntensityGLM(feature_names=FEATURES).fit(train["X"], train["events"], train["exposure"])
+    train, test = train_test_split_by_pack({k: v for k, v in fleet.rows.items() if k != "feature_names"})
+    names = fleet.rows["feature_names"]
+    glm = PoissonIntensityGLM(feature_names=names).fit(train["X"], train["events"], train["exposure"])
     lrt = glm.lrt_vs_homogeneous()
     gbm = fit_gradient_boosted_intensity(train["X"], train["events"], train["exposure"])
 
@@ -55,9 +57,11 @@ def main():
     mu_gbm = gbm.predict(test["X"]) * test["exposure"]
     mu_hom = glm.homogeneous_rate_ * test["exposure"]
     lines += ["## 1. Learned fault intensity  lambda_i(t) = lambda_0 exp(beta . x_i(t))\n",
-              f"Training rows: {train['events'].size:,} cell-months, {int(train['events'].sum())} faults.\n",
+              f"Training rows: {train['events'].size:,} cell-months, {int(train['events'].sum())} faults. "
+              "The model sees the MEASURED signals (`MonitoringConfig()`: all brief signals, placeholder noise); "
+              "the true hazard is driven by the true temperature, SOH gap and resistance gap.\n",
               "```", glm.summary(), "```",
-              f"True: log lambda_0 = {np.log(truth.base_rate):.4f}, "
+              f"True hazard: log lambda_0 = {np.log(truth.base_rate):.4f}, "
               + ", ".join(f"{f} = {truth.coef[f]}" for f in FEATURES) + "\n",
               f"Likelihood-ratio test vs simple Poisson (all lambdas equal): "
               f"LR = {lrt['lr_stat']:.1f}, df = {lrt['df']}, p = {lrt['p_value']:.2e}\n",
@@ -71,12 +75,32 @@ def main():
     hom_rate = 0.004
     hom = simulate("bypass", n_packs=120, pack=PackConfig(years=10.0),
                    hazard=HazardConfig.homogeneous(hom_rate), seed=12, record_rows=True)
-    g0 = PoissonIntensityGLM(feature_names=FEATURES).fit(hom.rows["X"], hom.rows["events"], hom.rows["exposure"])
+    g0 = PoissonIntensityGLM(feature_names=names).fit(hom.rows["X"], hom.rows["events"], hom.rows["exposure"])
     l0 = g0.lrt_vs_homogeneous()
     lines += ["### Reduction check: fleet with equal lambdas\n",
               f"True rate {hom_rate}; simple-Poisson MLE sum(y)/sum(e) = {g0.homogeneous_rate_:.5f}; "
               f"GLM slopes = {np.round(g0.coef_, 3).tolist()} (SE {np.round(g0.se_[1:], 3).tolist()}); "
               f"LRT p = {l0['p_value']:.3f} -> no evidence against the simple Poisson process.\n"]
+
+    # Which signals does the fault model need? Same fleet physics, different monitoring.
+    configs = {
+        "all brief signals, placeholder noise (default)": MonitoringConfig(),
+        "all brief signals, no noise": MonitoringConfig.perfect(),
+        "conventional BMS view: voltage + temperature": MonitoringConfig.only("voltage", "temperature"),
+        "no capacity / SOH / history": MonitoringConfig.only("voltage", "temperature", "soc", "resistance", "ocv"),
+        "capacity + resistance + temperature only": MonitoringConfig.only("capacity", "resistance", "temperature"),
+    }
+    lines += ["### Which monitored signals matter (held-out deviance, lower is better)\n",
+              "Each row reruns the same 120-pack fleet (identical cells and faults) with a different `MonitoringConfig`.\n",
+              "| monitoring | features | deviance |", "|---|---|---|",
+              f"| none (simple Poisson) | 0 | {poisson_deviance(test['events'], mu_hom):.5f} |"]
+    for label, mon in configs.items():
+        fl = simulate("bypass", n_packs=120, pack=PackConfig(years=10.0), hazard=truth, seed=11,
+                      record_rows=True, monitoring=mon)
+        tr, te = train_test_split_by_pack({k: v for k, v in fl.rows.items() if k != "feature_names"})
+        g = PoissonIntensityGLM().fit(tr["X"], tr["events"], tr["exposure"])
+        lines.append(f"| {label} | {tr['X'].shape[1]} | {poisson_deviance(te['events'], g.predict_mean(te['X'], te['exposure'])):.5f} |")
+    lines.append("")
 
     # ------------------------------------------------------------- 2. value it
     res = compare(n_packs=500, pack=pack, hazard=truth, seed=0)
@@ -166,6 +190,26 @@ def main():
     fig.tight_layout()
     fig.savefig(OUT / "value_vs_headroom.png", dpi=150)
     plt.close(fig)
+
+    # ------------------------------------------- 2c. when to bypass: control policies
+    policies = {
+        "fixed string (baseline)": None,
+        "bypass on empty + on fault (default)": ControlPolicy(),
+        "bypass on fault only": ControlPolicy(bypass_on_empty=False),
+        "+ isolate cells > 8% below pack SOH": ControlPolicy(isolate_if={"soh_gap": 0.08}),
+        "+ isolate cells with learned risk > 0.02 / y": ControlPolicy(isolate_if={"predicted_fault_rate": 0.02}, risk_model=glm),
+        "+ rest the 2 weakest cells each month": ControlPolicy(rest_count=2, rest_by="soh_gap"),
+    }
+    lines += [f"## 2c. When to bypass: control policies (k = {pack.bypass_headroom}, placeholder faults, 300 packs, median)\n",
+              "Every decision uses measured signals only. Isolating takes a cell out for good; resting takes it out "
+              "for one month. Both use bypass slots, keeping one spare for faults.\n",
+              "| policy | life (y) | MWh | service visits | availability | cells isolated |", "|---|---|---|---|---|---|"]
+    for label, pol in policies.items():
+        r = simulate("fixed" if pol is None else "bypass", n_packs=300, pack=long, hazard=truth, seed=0, policy=pol)
+        yrs = np.median(np.where(np.isfinite(r.retirement_year), r.retirement_year, long.years))
+        lines.append(f"| {label} | {yrs:.2f} | {np.median(r.delivered_mwh):.1f} | {np.median(r.service_visits):.0f} | "
+                     f"{100 * r.availability.mean():.2f}% | {r.isolated.mean():.1f} |")
+    lines.append("")
 
     # ------------------------------------------- 3. forward risk from the model
     # Take one pack at year 8, score each cell with the learned intensity, and

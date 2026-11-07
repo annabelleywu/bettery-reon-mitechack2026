@@ -38,6 +38,9 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from .control import ControlPolicy
+from .monitoring import Monitor, MonitoringConfig
+
 FEATURES = ["temp_offset_C", "soh_gap", "resistance_gap"]
 R_GAS = 8.314
 MIN_FRACTION = 0.05   # truncation for per-cell multipliers (fraction of the mean)
@@ -75,6 +78,12 @@ class AgingConfig:
       transfer ASSUMPTION; P_pack is the between-pack knee spread.
     * After the knee the cell fades linearly at kappa_i times the mean pre-knee
       rate b_bar = B(tau_bar)/tau_bar.
+    * With ``throughput_aging`` the cycle term counts each cell's own
+      equivalent full cycles (charge passed / nameplate charge), and the knee
+      clock advances with the calendar share of aging plus the cycle share
+      times the cell's use. A cell passing full nameplate charge every cycle
+      reproduces the closed form above exactly; a bypassed or rested cell
+      ages on calendar time only.
     * (m, tau_rel, kappa) are jointly normal across cells (see
       ``draw_cell_parameters``). Their covariance and the slope ratio come from
       hinge fits to 95 cells (``reon_model.calibration``); a slot's temperature
@@ -93,6 +102,7 @@ class AgingConfig:
     r0_cv: float = 0.05918
     resistance_growth: float = 7.48153   # R/R0 = 1 + growth * fractional fade
     # --- assumptions (not in the EV data) ---
+    throughput_aging: bool = True        # cycle aging follows each cell's own charge throughput
     knee_onset_years: float | None = None  # None: solve B(tau_bar) = knee_onset_fade
     k_cal: float = 0.02                  # calendar fade per sqrt(year)   (assumption)
     k_cyc: float = 1.0e-5                # fade per equivalent full cycle (assumption)
@@ -177,18 +187,27 @@ class HazardConfig:
         return cls(base_rate=rate, coef={f: 0.0 for f in FEATURES})
 
 
-def usable_capacity(Q, active, headroom):
-    """sum_i min(Q_i, Q_(h+1)) over active cells, vectorized over packs.
+def discharge(Q, active, headroom):
+    """One full discharge. Returns (string charge, charge each cell passed).
 
-    Q, active: (P, N); headroom: (P,) int >= 0. Returns (P,) in Q units.
+    Series cells share one current. Sorted active capacities Q_(1) <= ...; with
+    h cells allowed to drop out, the string stops when the (h+1)-th weakest
+    empties, and cell i passes min(Q_i, Q_(h+1)). h = 0: every cell passes
+    min Q (fixed string). Q, active: (P, N); headroom: (P,) int >= 0.
     """
     Q = np.asarray(Q, dtype=float)
     Qs = np.sort(np.where(active, Q, np.inf), axis=1)
     n_active = active.sum(axis=1)
     h = np.clip(np.asarray(headroom), 0, np.maximum(n_active - 1, 0))
     stop = np.take_along_axis(Qs, h[:, None], axis=1)
-    contrib = np.where(active, np.minimum(Q, stop), 0.0)
-    return np.where(n_active > 0, contrib.sum(axis=1), 0.0)
+    passed = np.where(active, np.minimum(Q, stop), 0.0)
+    passed = np.where((n_active > 0)[:, None], passed, 0.0)
+    return passed.sum(axis=1), passed
+
+
+def usable_capacity(Q, active, headroom):
+    """sum_i min(Q_i, Q_(h+1)) over active cells (see ``discharge``)."""
+    return discharge(Q, active, headroom)[0]
 
 
 class _CellSlots:
@@ -201,8 +220,11 @@ class _CellSlots:
         self.b_bar = float(aging.base_fade(self.tau_bar, cycles_per_year)) / self.tau_bar
         s = aging.knee_pack_logsd
         self.pack_knee = rng.lognormal(-s * s / 2, s, (P, 1)) if s > 0 else np.ones((P, 1))
+        B = float(aging.base_fade(self.tau_bar, cycles_per_year))
+        self.w_cal = aging.k_cal * np.sqrt(self.tau_bar) / B     # calendar share of aging
+        self.w_cyc = 1.0 - self.w_cal                             # cycle share at full use
         shape = (P, N)
-        for name in ("q0", "r0", "temp", "m", "tau", "kappa", "installed", "budget", "cum"):
+        for name in ("q0", "r0", "temp", "m", "tau", "kappa", "installed", "budget", "cum", "efc", "clock"):
             setattr(self, name, np.zeros(shape))
         self._fill(np.ones(shape, dtype=bool), t=0.0, initial=True)
 
@@ -218,14 +240,25 @@ class _CellSlots:
         self.installed[mask] = t
         self.budget[mask] = self.rng.exponential(1.0, n)
         self.cum[mask] = 0.0
+        self.efc[mask] = 0.0
+        self.clock[mask] = 0.0
 
     def replace(self, mask, t):
         self._fill(mask, t)
 
+    def advance(self, dt, use):
+        """Age every cell by dt years. ``use`` = charge passed per cycle in
+        nameplate units (1 = a full nameplate cycle), shape (P, N)."""
+        if not self.aging.throughput_aging:
+            use = np.ones_like(self.efc)
+        use = np.clip(use, 0.0, None)
+        self.efc += use * self.cpy * dt
+        self.clock += dt * (self.w_cal + self.w_cyc * use)
+
     def capacity(self, t):
         age = np.maximum(t - self.installed, 0.0)
-        fade = self.m * self.aging.base_fade(age, self.cpy)
-        fade += self.kappa * self.b_bar * np.maximum(age - self.tau, 0.0)
+        fade = self.m * (self.aging.k_cal * np.sqrt(age) + self.aging.k_cyc * self.efc)
+        fade += self.kappa * self.b_bar * np.maximum(self.clock - self.tau, 0.0)
         return np.clip(self.q0 - fade, 0.0, None)
 
     def resistance(self, Q):
@@ -254,77 +287,107 @@ class SimResult:
     service_visits: np.ndarray    # (P,) outages
     retirement_year: np.ndarray   # (P,) first t with retention < threshold (inf if none)
     delivered_mwh: np.ndarray     # (P,) energy delivered until retirement/horizon
-    rows: dict | None = None      # cell-period training rows (if recorded)
+    isolated: np.ndarray | None = None   # (P,) cells proactively isolated over horizon
+    rested_cell_steps: np.ndarray | None = None  # (P,) cell-steps spent resting
+    rows: dict | None = None      # cell-period training rows on MEASURED features (if recorded)
 
 
 def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
              aging: AgingConfig = AgingConfig(), hazard: HazardConfig = HazardConfig(),
-             seed: int = 0, record_rows: bool = False) -> SimResult:
-    """mode = 'fixed' (conventional string) or 'bypass' (cell-level control)."""
+             seed: int = 0, record_rows: bool = False,
+             monitoring: MonitoringConfig | None = None, policy: ControlPolicy | None = None) -> SimResult:
+    """mode = 'fixed' (conventional string) or 'bypass' (cell-level control under ``policy``).
+
+    ``monitoring`` sets which signals the controller and the learned model see
+    (default: all signals, placeholder noise). The fault hazard and aging always
+    use the true cell state. ``policy`` defaults to ``ControlPolicy()`` (bypass
+    on empty and on fault, nothing proactive); it is ignored in 'fixed' mode.
+    """
     if mode not in ("fixed", "bypass"):
         raise ValueError(mode)
+    policy = ControlPolicy.conventional() if mode == "fixed" else (policy or ControlPolicy())
+    monitoring = monitoring or MonitoringConfig()
     rng = np.random.default_rng(seed)       # same seed -> same initial cells in both modes
     P, N = n_packs, pack.n_series
     dt = 1.0 / pack.steps_per_year
     K = int(round(pack.years * pack.steps_per_year))
     t_grid = np.arange(K) * dt
     slots = _CellSlots(P, N, aging, pack.cycles_per_year, rng)
+    monitor = Monitor(monitoring, pack.steps_per_year, np.random.default_rng(seed + 10_007))
+    names = monitoring.feature_names()
     beta = hazard.beta
+    k_max = pack.bypass_headroom if mode == "bypass" else 0
 
-    bypassed = np.zeros((P, N), dtype=bool)
+    bypassed = np.zeros((P, N), dtype=bool)  # out of the string until the next service
+    passed = np.zeros((P, N))                # charge each cell gave in the last discharge
     downtime_left = np.zeros(P)              # days of outage still to serve
     energy = np.zeros((P, K)); avail = np.ones((P, K))
-    faults = np.zeros(P); visits = np.zeros(P)
+    faults = np.zeros(P); visits = np.zeros(P); isolated = np.zeros(P); rested_steps = np.zeros(P)
     rows = {"X": [], "events": [], "exposure": [], "pack": [], "t": []} if record_rows else None
     days_per_step = 365.0 * dt
 
     for k, t in enumerate(t_grid):
-        active = ~bypassed
         Q = slots.capacity(t)
         R = slots.resistance(Q)
-        X = cell_features(Q, R, slots.temp, active)
-        lam = hazard.base_rate * np.exp(X @ beta) * active  # bypassed cells are not at risk
+        in_string = ~bypassed
+        # --- what the BMS measures, and the controller's choices -------------
+        Xm = monitor.features(monitor.read(Q, slots.q0, R, slots.temp, passed), in_string)
+        left = k_max - bypassed.sum(axis=1)
+        iso = policy.isolate(Xm, names, in_string, left)
+        bypassed |= iso
+        isolated += iso.sum(axis=1)
+        in_string = ~bypassed
+        left = k_max - bypassed.sum(axis=1)
+        rested = policy.rest(Xm, names, in_string, left)
+        rested_steps += rested.sum(axis=1)
+        discharging = in_string & ~rested
+        headroom = (left - rested.sum(axis=1)) if policy.bypass_on_empty else np.zeros(P, dtype=int)
+
+        # --- true fault hazard (cells out of the string are not at risk) -------
+        X = cell_features(Q, R, slots.temp, in_string)
+        lam = hazard.base_rate * np.exp(X @ beta) * in_string
 
         # --- usable energy at the start of this step ---------------------------
-        if mode == "fixed":
-            cap = N * Q.min(axis=1)
-        else:
-            headroom = pack.bypass_headroom - bypassed.sum(axis=1)
-            cap = usable_capacity(Q, active, headroom) * pack.switch_efficiency
+        cap, passed = discharge(Q, discharging, headroom)
+        if mode == "bypass":
+            cap = cap * pack.switch_efficiency
         energy[:, k] = cap * pack.cell_ah * pack.v_nominal / 1000.0
 
         # --- faults within this step (exact for piecewise-constant hazard) -------
         cum_prev = slots.cum.copy()
         slots.cum += lam * dt
-        fault = active & (slots.cum >= slots.budget)
+        fault = in_string & (slots.cum >= slots.budget)
         if record_rows:
             with np.errstate(divide="ignore", invalid="ignore"):
                 expo = np.where(fault, (slots.budget - cum_prev) / lam, dt)
-            m = active
-            rows["X"].append(X[m]); rows["events"].append(fault[m].astype(float))
+            m = in_string
+            rows["X"].append(Xm[m]); rows["events"].append(fault[m].astype(float))
             rows["exposure"].append(expo[m]); rows["pack"].append(np.nonzero(m)[0])
             rows["t"].append(np.full(int(m.sum()), t))
         n_fault = fault.sum(axis=1)
         faults += n_fault
 
         # --- control response ------------------------------------------------
-        if mode == "fixed":
+        if not policy.bypass_on_fault:
             # any fault stops the string; a technician swaps the cell
             visits += n_fault
             downtime_left += n_fault * pack.repair_days
-            slots.replace(fault, t + dt)
+            swap = fault
         else:
             bypassed |= fault
-            over = bypassed.sum(axis=1) > pack.bypass_headroom
+            over = bypassed.sum(axis=1) > k_max
             visits += over
             downtime_left += over * pack.repair_days
             swap = bypassed & over[:, None]
-            slots.replace(swap, t + dt)
             bypassed &= ~swap
 
         served = np.minimum(downtime_left, days_per_step)
         avail[:, k] = 1.0 - served / days_per_step
         downtime_left -= served
+        slots.advance(dt, passed * avail[:, k][:, None])
+        slots.replace(swap, t + dt)
+        monitor.reset_cells(swap)
+        passed = np.where(swap, 0.0, passed)
 
     retention = energy / pack.nameplate_kwh
     below = retention < pack.retirement_retention
@@ -335,13 +398,17 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
 
     if record_rows:
         rows = {key: np.concatenate(v) for key, v in rows.items()}
-    return SimResult(mode, t_grid, energy, retention, avail, faults, visits, retire, delivered, rows)
+        rows["feature_names"] = names
+    return SimResult(mode, t_grid, energy, retention, avail, faults, visits, retire, delivered,
+                     isolated, rested_steps, rows)
 
 
-def compare(n_packs=200, pack=PackConfig(), aging=AgingConfig(), hazard=HazardConfig(), seed=0):
+def compare(n_packs=200, pack=PackConfig(), aging=AgingConfig(), hazard=HazardConfig(), seed=0,
+            monitoring=None, policy=None):
     """Run both architectures on identical initial cells (common random numbers)."""
-    return {m: simulate(m, n_packs, pack, aging, hazard, seed) for m in ("fixed", "bypass")}
+    return {m: simulate(m, n_packs, pack, aging, hazard, seed, monitoring=monitoring, policy=policy)
+            for m in ("fixed", "bypass")}
 
 
 __all__ = ["FEATURES", "PackConfig", "AgingConfig", "draw_cell_parameters", "HazardConfig", "SimResult",
-           "simulate", "compare", "usable_capacity", "cell_features"]
+           "simulate", "compare", "discharge", "usable_capacity", "cell_features"]

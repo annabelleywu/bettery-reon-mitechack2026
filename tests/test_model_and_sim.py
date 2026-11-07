@@ -4,6 +4,8 @@ from scipy import stats
 
 from reon_model import (
     FEATURES,
+    AgingConfig,
+    MonitoringConfig,
     HazardConfig,
     PackConfig,
     PoissonIntensityGLM,
@@ -86,15 +88,20 @@ def test_fixed_string_with_equal_rates_gives_poisson_fault_counts():
 
 
 def test_simulation_rows_refit_true_hazard():
+    """With noise-free readings of exactly the hazard's three signals, the GLM
+    on measured features recovers the true coefficients."""
     hz = HazardConfig(base_rate=0.004)
-    res = simulate("bypass", n_packs=150, hazard=hz, seed=7, record_rows=True)
+    mon = MonitoringConfig.only("temperature", "capacity", "resistance", noisy=False)
+    res = simulate("bypass", n_packs=150, hazard=hz, seed=7, record_rows=True, monitoring=mon)
     r = res.rows
+    assert r["feature_names"] == FEATURES
     m = PoissonIntensityGLM(feature_names=FEATURES).fit(r["X"], r["events"], r["exposure"])
     assert np.all(np.abs(m.coef_ - hz.beta) < 4 * m.se_[1:] + 1e-9)
 
 
 def test_bypass_never_worse_than_fixed_before_first_fault():
-    res_f = simulate("fixed", n_packs=50, seed=3, hazard=HazardConfig(base_rate=1e-9))
-    res_b = simulate("bypass", n_packs=50, seed=3, hazard=HazardConfig(base_rate=1e-9),
+    ag = AgingConfig(throughput_aging=False)   # same aging in both: a pure capacity comparison
+    res_f = simulate("fixed", n_packs=50, seed=3, hazard=HazardConfig(base_rate=1e-9), aging=ag)
+    res_b = simulate("bypass", n_packs=50, seed=3, hazard=HazardConfig(base_rate=1e-9), aging=ag,
                      pack=PackConfig(switch_efficiency=1.0))
     assert np.all(res_b.energy_kwh >= res_f.energy_kwh - 1e-9)
