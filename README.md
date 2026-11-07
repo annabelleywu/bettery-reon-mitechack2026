@@ -13,6 +13,8 @@ python -m pytest -q             # 41 tests (2 need the paper data)
 python scripts/run_demo.py      # writes outputs/summary.md and figures
 ```
 
+**Interactive explorer:** open `webapp/index.html` in a browser (no server or build needed). It is a JavaScript port of the same model: sliders for every assumption, per-cell capacity rings for both designs over time, and the change in service life, lifetime energy and outages against both the fixed string and the default settings.
+
 > **What is calibrated and what is not.** The cell-to-cell aging *spread* (rates, knee onset, post-knee slopes and their correlations) comes from real per-cell data and is checked against held-out fleet metrics. The stationary *timeline* (fade per year, knee onset in years), the NMC-to-sodium-ion transfer, the pack design and every fault-hazard number are assumptions. Nothing here is a REON performance claim.
 
 ## 1. Fault model: NHPP with a learned intensity
@@ -138,6 +140,7 @@ data/calibration_zhou2026.json fitted aging parameters (committed; raw paper dat
 scripts/fetch_paper_data.sh    download the paper source data
 scripts/calibrate.py           refit + validation report -> outputs/calibration_report.md
 scripts/run_demo.py            end-to-end demo -> outputs/
+webapp/index.html              interactive explorer (JS port of the model, runs in the browser)
 tests/                         reduction-to-Poisson and model tests
 ```
 
