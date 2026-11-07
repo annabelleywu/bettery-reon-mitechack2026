@@ -1,3 +1,6 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Cell Bypass Explorer</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,7 +38,7 @@
 }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
-.wrap { max-width: 1320px; margin: 0 auto; padding-block: 20px 40px;
+.wrap { max-width: 1320px; margin: 0 auto; padding-top: calc(20px + env(safe-area-inset-top, 0px)); padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 16px; }
 h1 { font-size: 26px; font-weight: 750; font-stretch: 85%; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
@@ -99,13 +102,32 @@ button:focus-visible, input:focus-visible, summary:focus-visible, select:focus-v
 .foot { font-size: 12px; color: var(--muted); max-width: 90ch; }
 .foot b { color: var(--ink); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+fieldset.choice { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+fieldset.choice legend { font-size: 13px; padding: 0; margin-bottom: 2px; }
+fieldset.choice label { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; color: var(--ink); }
+fieldset.choice input { margin-top: 3px; accent-color: var(--cell); }
+fieldset.choice.off { opacity: 0.45; }
+.kpis2 { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 12px; color: var(--muted); padding: 0 2px; }
+.kpis2 b { color: var(--ink); font-weight: 600; margin-right: 4px; }
+.two.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 1100px) { .two.even { grid-template-columns: minmax(0, 1fr); } }
+.econ { width: 100%; border-collapse: collapse; font-size: 13px; }
+.econ th, .econ td { padding: 6px 8px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+.econ th { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.econ .num { text-align: right; font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.econ .cellc { color: var(--cell); }
+.econ small { display: block; color: var(--muted); font-size: 11px; }
+.econsum { font-size: 12.5px; color: var(--muted); margin: 10px 0 0; }
+.econsum b { color: var(--ink); font-weight: 600; }
 </style>
 
+</head><body>
 <div class="wrap">
   <header>
     <div>
       <h1>Cell Bypass Explorer</h1>
-      <p class="sub">How much does switching individual cells in and out of a series string buy, against a fixed string, for one 60 kWh stationary block? Move any assumption; the simulation reruns in your browser.</p>
+      <p class="sub">How much does switching individual cells in and out of a series string buy, against a fixed string, for REON EBS blocks (30 kW / 60 kWh) at a Massachusetts commercial site, and what is it worth to the owner? Chemistry-agnostic: the cell-to-cell spread is an input. Move any assumption; the simulation reruns in your browser.</p>
     </div>
     <div class="status" id="status" aria-live="polite">Simulating…</div>
   </header>
@@ -115,6 +137,13 @@ button:focus-visible, input:focus-visible, summary:focus-visible, select:focus-v
 
     <section class="main">
       <div class="kpis" id="kpis"></div>
+      <div class="kpis2" id="kpis2"></div>
+
+      <div class="card">
+        <h2 id="econTitle">Value for a Massachusetts C&amp;I owner</h2>
+        <p class="cap">Revenue is computed each year from the simulated usable energy at the AC meter: ConnectedSolutions pays on average kW held through events, demand charges on the monthly peak, Clean Peak on MWh discharged at peak. Values are medians over the simulated packs. Every input is in "Application: Massachusetts C&amp;I site", with its source.</p>
+        <div id="econBody"></div>
+      </div>
 
       <div class="card">
         <h2 id="ringTitle">One spoke = one cell</h2>
@@ -139,17 +168,30 @@ button:focus-visible, input:focus-visible, summary:focus-visible, select:focus-v
       <div class="two">
         <div class="card chart">
           <h2>Usable energy over the block's life</h2>
-          <p class="cap">Median (line) and P10 to P90 range (band) over the simulated packs, as a share of nameplate energy. Dotted lines are the default settings, for comparison.</p>
+          <p class="cap" id="retCap"></p>
           <svg id="retChart" viewBox="0 0 640 330" role="img" aria-label="Retention over time"></svg>
         </div>
         <div class="card chart">
           <h2>What the voltage window is worth</h2>
-          <p class="cap">Extra lifetime energy against the fixed string for each bypass headroom k, with everything else as set. Faults included.</p>
+          <p class="cap">Capacity recovery. Extra lifetime energy against the fixed string for each bypass headroom k, with everything else as set.</p>
           <svg id="sweepChart" viewBox="0 0 440 330" role="img" aria-label="Gain by bypass headroom"></svg>
         </div>
       </div>
 
-      <p class="foot"><b>Where the numbers come from.</b> Cell-to-cell aging spread (rates, knee timing, post-knee slopes and their correlations) is calibrated on per-cell field data from Zhou et al., Nature Energy (2026), NMC car cells. The stationary timeline, the sodium-ion transfer, sensor noise, the OCV curve and every fault rate are placeholders. Estimates under stated assumptions, not REON performance claims. Model code: github.com/annabelleywu/mitec2026.</p>
+      <div class="two even">
+        <div class="card chart">
+          <h2>Where cell-level control pays: cell-to-cell spread</h2>
+          <p class="cap">Extra lifetime energy (and service life) against the fixed string as the within-pack spread widens. Above the red line, the energy gain outweighs the extra BMS cost per delivered MWh. 1× is the spread fitted to the paper's cells. Wider spreads stand for looser binning, hot spots, mixed-age or second-life packs (illustrative, not measured).</p>
+          <svg id="spreadChart" viewBox="0 0 440 330" role="img" aria-label="Gain by cell spread"></svg>
+        </div>
+        <div class="card chart">
+          <h2>Lifetime optimization: when to rest a cell</h2>
+          <p class="cap">Resting takes a cell out of the string for a month so it ages on calendar time only. Cells are ranked by predicted remaining life (their own 12-month fade trend blended with a fade-proportional pack prior) and rested only before the pack's measured health falls to the stop level. The threshold is an output of the tool, not a guess.</p>
+          <svg id="restChart" viewBox="0 0 440 330" role="img" aria-label="Gain by rest threshold"></svg>
+        </div>
+      </div>
+
+      <p class="foot"><b>Where the numbers come from.</b> Cell-to-cell aging spread (rates, knee timing, post-knee slopes and their correlations) is calibrated on per-cell field data from Zhou et al., Nature Energy (2026), whose capacities are normalised to new-cell nominal capacity; the model treats chemistry through the spread multiplier. The stationary timeline, sensor noise, the OCV curve, the voltage floor in βpower, the switch loss, round-trip and inverter efficiency, installed cost, peak-shaving duration and realization, cell mass, and the optional sudden-fault rates are placeholders. Massachusetts revenue inputs come from Mass Save/National Grid program materials, Eversource rate summaries, mass.gov and Modo Energy; CO₂ factors from ISO-NE (2024) and Fraunhofer (2025). The BMS cost overhead (+4–6% of system cost) is from REON's CTO on the hack Discord. Sudden faults are off by default: the paper reports gradual drift into an ageing knee, not sudden failures. The browser runs few packs for speed; at equal settings and 300 packs it matches the Python model (+6.0% vs +6% lifetime energy at k = 4). Estimates under stated assumptions, not REON performance claims. Model code: github.com/annabelleywu/mitec2026.</p>
     </section>
   </div>
 </div>
@@ -164,17 +206,26 @@ const CAL = { // calibrated on Zhou et al. 2026 (data/calibration_zhou2026.json)
   resGrowth: 7.48, r0CV: 0.059,
 };
 const DEFAULTS = {
-  N: 96, k: 4, eff: 99.5, retire: 70, cpy: 365, packs: 48,
-  bypassOnEmpty: true, bypassOnFault: true, isolateGap: 0, isoTemp: 0, isoRes: 0, restCount: 0, spare: 1,
+  N: 96, k: 4, eff: 99.5, retire: 70, denom: "nameplate", cpy: 365, packs: 48,
+  blockKWh: 60, ratedKW: 30, duration: 2, bmsOverhead: 4, sysCost: 600,
+  // Massachusetts C&I application (Eversource Greater Boston G-2), see MA_Economics_Research.md
+  nBlocks: 2, acEff: 96, rte: 88, csRate: 200, csHrs: 3, csEvents: 45, dcRate: 33.95, dcHrs: 2, dcRealize: 75,
+  cpsClear: 87, cpsMult: 1.0, energyPrice: 0.20, itc: 30, discount: 8, startYear: 2027,
+  gridCO2: 597, embodiedCO2: 80, cellKgPerKWh: 7, horizon: 20, restTemp: 0,
+  bypassOnEmpty: true, bypassOnFault: true, isolateGap: 0, isoTemp: 0, isoRes: 0,
+  restCount: 2, restRule: "life", restThresh: 20, restGap: 0, restStop: 85, spare: 1,
+  spreadMult: 1, outlierFrac: 0, outlierKnee: 0.8,
   rateCV: 0.379, kneeCV: 0.044, slopeCV: 0.347, slopeShrink: 0.537, slopeRatio: 8.38, q0CV: 0.47, packKneeSD: 0.139,
   tempSD: 2.0, kneeAuto: true, kneeYears: 6.6, kCal: 0.020, kCyc: 10, throughput: true,
-  faultRate: 1.5, faultSoh: 10, repairDays: 14,
+  faultRate: 0, faultSoh: 10, repairDays: 14,
   sig: { voltage: { on: true, noise: 2 }, temperature: { on: true, noise: 0.5 }, soc: { on: true, noise: 1 },
          soh: { on: true, noise: 1 }, capacity: { on: true, noise: 1 }, resistance: { on: true, noise: 2 },
          ocv: { on: true, noise: 2 }, history: { on: true, noise: 6 } },
 };
-const YEARS = 20, SPY = 12, K = YEARS * SPY, DT = 1 / SPY, BLOCK_KWH = 60, VNOM = 3.1;
+const YEARS = 20, SPY = 12, K = YEARS * SPY, DT = 1 / SPY;
 const ARR = 50e3 / (8.314 * 298.15 * 298.15); // Arrhenius slope per degC at 25 C
+const HIST = 13;            // months of capacity estimates kept per cell (12-month trend)
+const V_FLOOR = 2.5;        // per-cell discharge voltage floor for the power metric (placeholder)
 const clone = o => JSON.parse(JSON.stringify(o));
 let P = clone(DEFAULTS);
 
@@ -188,8 +239,14 @@ function ocv(s) { s = Math.min(1, Math.max(0, s)); return OCV_MIN + (OCV_MAX - O
 const OCV_TAB = Array.from({ length: 1001 }, (_, i) => ocv(i / 1000));
 function ocvInv(v) { if (v <= OCV_TAB[0]) return 0; if (v >= OCV_TAB[1000]) return 1; let lo = 0, hi = 1000; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (OCV_TAB[mid] < v) lo = mid; else hi = mid; } return (lo + (v - OCV_TAB[lo]) / (OCV_TAB[hi] - OCV_TAB[lo])) / 1000; }
 function ocvSlope(s) { const i = Math.min(999, Math.max(0, Math.floor(s * 1000))); return (OCV_TAB[i + 1] - OCV_TAB[i]) * 1000; }
+const OCV_MID = ocv(0.5);
 
 // ---------------------------------------------------------------- model helpers
+// Chemistry-agnostic: every within-pack spread is the calibrated value times one multiplier.
+function effective(p) {
+  const s = p.spreadMult;
+  return Object.assign({}, p, { rateCV: p.rateCV * s, kneeCV: p.kneeCV * s, slopeCV: p.slopeCV * s, q0CV: p.q0CV * s, r0CV: CAL.r0CV * s });
+}
 function chol3(p) {
   const s = [p.rateCV, p.kneeCV, p.slopeCV], c = [[1, CAL.corr01, CAL.corr02], [CAL.corr01, 1, CAL.corr12], [CAL.corr02, CAL.corr12, 1]];
   const S = [0, 1, 2].map(i => [0, 1, 2].map(j => c[i][j] * s[i] * s[j]));
@@ -215,17 +272,61 @@ function newCell(c, i, r, p, L, temp) {
   } else if (sT > 0) { // replacement cell in a slot of known temperature
     z0 = p.rateCV * (rho * (temp / sT) + Math.sqrt(1 - rho * rho) * (z0 / Math.max(p.rateCV, 1e-9)));
   }
+  // Paper-aligned outliers: cells with less favourable initial condition or harsher local history knee early.
+  const outlier = r() < p.outlierFrac;
   c.m[i] = Math.max(0.05, 1 + z0);
-  c.tauRel[i] = Math.max(0.05, 1 + z1);
+  c.tauRel[i] = Math.max(0.05, 1 + z1) * (outlier ? p.outlierKnee : 1);
   c.kappa[i] = p.slopeRatio * Math.max(0.05, 1 + p.slopeShrink * z2);
   c.q0[i] = 1 + p.q0CV / 100 * gauss(r);
-  c.r0[i] = 1 + CAL.r0CV * gauss(r);
+  c.r0[i] = 1 + p.r0CV * gauss(r);
   c.budget[i] = -Math.log(1 - r());
-  c.cum[i] = 0; c.efc[i] = 0; c.clock[i] = 0; c.installed[i] = 0; c.est[i] = NaN;
+  c.cum[i] = 0; c.efc[i] = 0; c.clock[i] = 0; c.installed[i] = 0; c.est[i] = NaN; c.nh[i] = 0;
+}
+
+// Remaining life of each cell from MEASURED estimates: months until it would cross the retirement
+// level, from a fade rate that blends its own 12-month trend with a fade-proportional prior.
+function remainingLife(c, N, bypassed, retireLevel, out) {
+  let sumSlope = 0, nS = 0, sumFade = 0, nF = 0;
+  const own = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    own[i] = NaN; if (bypassed[i] || !isFinite(c.est[i])) continue;
+    sumFade += 1 - c.est[i]; nF++;
+    const n = Math.min(c.nh[i], HIST); if (n < 6) continue;
+    let st = 0, sy = 0, stt = 0, sty = 0;
+    for (let j = 0; j < n; j++) { const y = c.hist[i * HIST + ((c.nh[i] - 1 - j) % HIST)], t = -j / SPY; st += t; sy += y; stt += t * t; sty += t * y; }
+    const slope = -(n * sty - st * sy) / (n * stt - st * st); // fade per year (positive = losing capacity)
+    own[i] = slope; sumSlope += slope; nS++;
+  }
+  const packSlope = nS ? Math.max(sumSlope / nS, 1e-4) : NaN, meanFade = nF ? Math.max(sumFade / nF, 1e-4) : NaN;
+  for (let i = 0; i < N; i++) {
+    out[i] = NaN; if (bypassed[i] || !isFinite(c.est[i]) || !isFinite(packSlope)) continue;
+    const prior = packSlope * Math.max(1 - c.est[i], 1e-4) / meanFade;
+    const rate = Math.max(isFinite(own[i]) ? 0.5 * own[i] + 0.5 * prior : prior, 1e-4);
+    out[i] = (c.est[i] - retireLevel) / rate; // years
+  }
+}
+
+// Power utilisation (Zhou et al. 2026, beta_power): pack peak power over the sum of cell peak powers.
+// Series cells share one current, so the pack current is set by the highest-resistance cell;
+// with bypass, up to h of the highest-resistance cells can be switched out first.
+function betaPower(R, active, N, h) {
+  const rs = []; for (let i = 0; i < N; i++) if (active[i]) rs.push(R[i]);
+  if (!rs.length) return NaN;
+  rs.sort((a, b) => b - a);
+  const dv = OCV_MID - V_FLOOR;
+  let sumCell = 0; for (const r of rs) sumCell += (dv / r) * V_FLOOR;
+  let best = 0;
+  for (let drop = 0; drop <= Math.min(h, rs.length - 1); drop++) {
+    const I = dv / rs[drop]; let p = 0;
+    for (let j = drop; j < rs.length; j++) p += I * (OCV_MID - rs[j] * I);
+    best = Math.max(best, p);
+  }
+  return best / sumCell;
 }
 
 // ---------------------------------------------------------------- one pack, one architecture
-function simPack(p, mode, pk, trace) {
+function simPack(p0, mode, pk, trace) {
+  const p = effective(p0);
   const N = p.N, kmax = mode === "cell" ? Math.min(p.k, N - 1) : 0;
   const r0 = rng(1000003 * (pk + 1) + 17), rRep = rng(7919 * (pk + 1) + 3), rMeas = rng(104729 * (pk + 1) + (mode === "cell" ? 11 : 5));
   const L = chol3(p);
@@ -233,14 +334,14 @@ function simPack(p, mode, pk, trace) {
   const wCal = p.kCal * Math.sqrt(tauBar) / B, wCyc = 1 - wCal;
   const packKnee = Math.exp(p.packKneeSD * gauss(r0) - p.packKneeSD * p.packKneeSD / 2);
   const F = n => new Float64Array(n);
-  const c = { temp: F(N), m: F(N), tauRel: F(N), kappa: F(N), q0: F(N), r0: F(N), budget: F(N), cum: F(N), efc: F(N), clock: F(N), installed: F(N), est: F(N) };
+  const c = { temp: F(N), m: F(N), tauRel: F(N), kappa: F(N), q0: F(N), r0: F(N), budget: F(N), cum: F(N), efc: F(N), clock: F(N), installed: F(N), est: F(N), hist: F(N * HIST), nh: new Int32Array(N) };
   for (let i = 0; i < N; i++) newCell(c, i, r0, p, L);
-  const cellAh = BLOCK_KWH * 1000 / (N * VNOM);
+  const cellAh = p.blockKWh * 1000 / (N * 3.1);
   const curr = 0.5 * cellAh, rOhm = 0.0004 * 200 / cellAh;
   const bypassed = new Uint8Array(N), isolated = new Uint8Array(N);
-  const Q = F(N), R = F(N), passed = F(N), rested = new Uint8Array(N), sortBuf = F(N);
-  const energy = F(K), avail = F(K);
-  let downtime = 0, visits = 0, faults = 0, nIso = 0;
+  const Q = F(N), R = F(N), passed = F(N), rested = new Uint8Array(N), sortBuf = F(N), life = F(N), active = new Uint8Array(N);
+  const energy = F(K), avail = F(K), bpow = F(K), restN = F(K);
+  let downtime = 0, visits = 0, faults = 0, nIso = 0, restSteps = 0;
   const sig = p.sig, alpha = sig.history.on ? 2 / (Math.max(1, sig.history.noise) + 1) : 1;
   const canEstimate = (sig.capacity.on || sig.soh.on || sig.soc.on || sig.ocv.on || sig.voltage.on);
   const useEstimate = mode === "cell" && canEstimate && (p.isolateGap > 0 || p.restCount > 0);
@@ -280,7 +381,10 @@ function simPack(p, mode, pk, trace) {
             viaSoc(ocvInv(v + curr * rMeasd * rOhm), Math.max(sdV, 1e-5) / slope);
           }
         }
-        if (wsum > 0) { const x = xsum / wsum; c.est[i] = isFinite(c.est[i]) ? c.est[i] + alpha * (x - c.est[i]) : x; }
+        if (wsum > 0) {
+          const x = xsum / wsum; c.est[i] = isFinite(c.est[i]) ? c.est[i] + alpha * (x - c.est[i]) : x;
+          c.hist[i * HIST + (c.nh[i] % HIST)] = c.est[i]; c.nh[i]++;
+        }
       }
     }
     // ---- control decisions (measured signals only)
@@ -303,22 +407,51 @@ function simPack(p, mode, pk, trace) {
       for (const [, i] of cand) { if (allow <= 0) break; bypassed[i] = 1; isolated[i] = 1; nIso++; nOut++; allow--; }
     }
     let nRest = 0;
-    if (mode === "cell" && p.restCount > 0 && useEstimate) {
-      let mEst = 0, nE = 0; for (let i = 0; i < N; i++) if (!bypassed[i] && isFinite(c.est[i])) { mEst += c.est[i]; nE++; }
-      mEst /= Math.max(nE, 1);
-      const cand = []; for (let i = 0; i < N; i++) if (!bypassed[i] && isFinite(c.est[i]) && c.est[i] < mEst) cand.push([mEst - c.est[i], i]);
+    let packEst = 0, nPE = 0; for (let i = 0; i < N; i++) if (!bypassed[i] && isFinite(c.est[i])) { packEst += c.est[i]; nPE++; }
+    packEst = nPE ? packEst / nPE : 1;
+    // resting is a pre-knee tool: stop once the measured pack mean falls to restStop % (late-life headroom goes to bypass on empty)
+    if (mode === "cell" && p.restCount > 0 && useEstimate && packEst * 100 > p.restStop) {
+      let allow = Math.min(p.restCount, kmax - nOut - p.spare);
+      const cand = [];
+      if (allow > 0 && p.restRule === "life") {
+        // rest cells whose remaining life is more than restThresh % below the pack median
+        remainingLife(c, N, bypassed, p.retire / 100, life);
+        const ls = []; for (let i = 0; i < N; i++) if (isFinite(life[i])) ls.push(life[i]);
+        if (ls.length) {
+          ls.sort((a, b) => a - b); const med = ls[ls.length >> 1], cut = med * (1 - p.restThresh / 100);
+          for (let i = 0; i < N; i++) if (isFinite(life[i]) && life[i] < cut) cand.push([-life[i], i]);
+        }
+      } else if (allow > 0) {
+        // rest cells whose estimated capacity is more than restGap points below the pack mean
+        let mEst = 0, nE = 0; for (let i = 0; i < N; i++) if (!bypassed[i] && isFinite(c.est[i])) { mEst += c.est[i]; nE++; }
+        mEst /= Math.max(nE, 1);
+        for (let i = 0; i < N; i++) if (!bypassed[i] && isFinite(c.est[i]) && (mEst - c.est[i]) * 100 > p.restGap) cand.push([mEst - c.est[i], i]);
+      }
       cand.sort((a, b) => b[0] - a[0]);
-      const allow = Math.min(p.restCount, kmax - nOut - p.spare);
       for (let j = 0; j < Math.min(allow, cand.length); j++) { rested[cand[j][1]] = 1; nRest++; }
+      restSteps += nRest;
     }
+    // REON (Discord): "our BMS can let a 'hot' cell be bypassed and take a rest". Temperature-triggered resting
+    // runs at any point in life, on the measured temperature, within the same headroom.
+    if (mode === "cell" && p.restTemp > 0 && sig.temperature.on) {
+      let mT = 0, nT = 0; for (let i = 0; i < N; i++) if (!bypassed[i]) { mT += c.temp[i]; nT++; } mT /= Math.max(nT, 1);
+      const hot = [];
+      for (let i = 0; i < N; i++) if (!bypassed[i] && !rested[i]) { const x = c.temp[i] + sig.temperature.noise * gauss(rMeas) - mT; if (x > p.restTemp) hot.push([x, i]); }
+      hot.sort((a, b) => b[0] - a[0]);
+      const room = kmax - nOut - p.spare - nRest;
+      for (let j = 0; j < Math.min(room, hot.length); j++) { rested[hot[j][1]] = 1; nRest++; }
+      restSteps += Math.min(Math.max(room, 0), hot.length);
+    }
+    restN[k] = nRest;
     // ---- one discharge: the string stops when the (h+1)-th weakest active cell empties
-    let nAct = 0; for (let i = 0; i < N; i++) if (!bypassed[i] && !rested[i]) sortBuf[nAct++] = Q[i];
+    let nAct = 0; for (let i = 0; i < N; i++) { active[i] = !bypassed[i] && !rested[i] ? 1 : 0; if (active[i]) sortBuf[nAct++] = Q[i]; }
     const act = sortBuf.subarray(0, nAct); act.sort();
     const h = (mode === "cell" && p.bypassOnEmpty) ? Math.max(0, kmax - nOut - nRest) : 0;
     const stop = nAct ? act[Math.min(h, nAct - 1)] : 0;
     let cap = 0;
-    for (let i = 0; i < N; i++) { const on = !bypassed[i] && !rested[i]; passed[i] = on ? Math.min(Q[i], stop) : 0; cap += passed[i]; }
-    energy[k] = cap * cellAh * VNOM / 1000 * (mode === "cell" ? p.eff / 100 : 1);
+    for (let i = 0; i < N; i++) { passed[i] = active[i] ? Math.min(Q[i], stop) : 0; cap += passed[i]; }
+    energy[k] = cap * cellAh * 3.1 / 1000 * (mode === "cell" ? p.eff / 100 : 1);
+    bpow[k] = betaPower(R, active, N, mode === "cell" ? h : 0);
     if (tr) {
       tr.stop[k] = stop; tr.cap[k] = energy[k];
       let se = 0, ne = 0;
@@ -329,16 +462,18 @@ function simPack(p, mode, pk, trace) {
       }
       tr.estErr[k] = ne ? Math.sqrt(se / ne) : NaN;
     }
-    // ---- true fault hazard (placeholder NHPP); cells out of the string are not at risk
-    let mQ = 0, mT2 = 0, nIn = 0; const rr = [];
-    for (let i = 0; i < N; i++) if (!bypassed[i]) { mQ += Q[i]; mT2 += c.temp[i]; nIn++; rr.push(R[i]); }
-    mQ /= Math.max(nIn, 1); mT2 /= Math.max(nIn, 1); rr.sort((a, b) => a - b); const rMed2 = rr[rr.length >> 1] || 1;
+    // ---- optional sudden faults (placeholder NHPP; the paper's data has none); cells out of the string are not at risk
     let newFaults = 0; const fault = [];
-    for (let i = 0; i < N; i++) {
-      if (bypassed[i]) continue;
-      const lam = p.faultRate / 1000 * Math.exp(0.12 * (c.temp[i] - mT2) + p.faultSoh * (mQ - Q[i]) + 1.5 * (R[i] / rMed2 - 1));
-      c.cum[i] += lam * DT;
-      if (c.cum[i] >= c.budget[i]) { fault.push(i); newFaults++; }
+    if (p.faultRate > 0) {
+      let mQ = 0, mT2 = 0, nIn = 0; const rr = [];
+      for (let i = 0; i < N; i++) if (!bypassed[i]) { mQ += Q[i]; mT2 += c.temp[i]; nIn++; rr.push(R[i]); }
+      mQ /= Math.max(nIn, 1); mT2 /= Math.max(nIn, 1); rr.sort((a, b) => a - b); const rMed2 = rr[rr.length >> 1] || 1;
+      for (let i = 0; i < N; i++) {
+        if (bypassed[i]) continue;
+        const lam = p.faultRate / 1000 * Math.exp(0.12 * (c.temp[i] - mT2) + p.faultSoh * (mQ - Q[i]) + 1.5 * (R[i] / rMed2 - 1));
+        c.cum[i] += lam * DT;
+        if (c.cum[i] >= c.budget[i]) { fault.push(i); newFaults++; }
+      }
     }
     faults += newFaults;
     const swap = [];
@@ -357,50 +492,137 @@ function simPack(p, mode, pk, trace) {
     }
     for (const i of swap) { const tp = c.temp[i]; newCell(c, i, rRep, p, L, tp); c.temp[i] = tp; c.installed[i] = t + DT; bypassed[i] = 0; isolated[i] = 0; passed[i] = 0; }
   }
-  // retirement and delivered energy
-  let first = K; for (let k = 0; k < K; k++) if (energy[k] / BLOCK_KWH * 100 < p.retire) { first = k; break; }
+  // retirement: share of nameplate energy, or (brief's R_sys) of this design's own beginning-of-life energy
+  const denom = p.denom === "bol" ? energy[0] : p.blockKWh;
+  const ret = F(K); for (let k = 0; k < K; k++) ret[k] = energy[k] / denom;
+  let first = K; for (let k = 0; k < K; k++) if (ret[k] * 100 < p.retire) { first = k; break; }
   let mwh = 0; for (let k = 0; k < first; k++) mwh += energy[k] * avail[k] * p.cpy * DT / 1000;
   let av = 0; for (let k = 0; k < K; k++) av += avail[k];
-  return { energy, life: first * DT, mwh, visits, faults, avail: av / K, nIso, tr };
+  const firmKW = F(K); for (let k = 0; k < K; k++) firmKW[k] = k < first ? Math.min(p.ratedKW, energy[k] / p.duration) * avail[k] : 0;
+  return { energy, availM: avail, ret, firmKW, bpow, life: first * DT, mwh, visits, faults, avail: av / K, nIso, restSteps, tr };
 }
 
+// ---------------------------------------------------------------- Massachusetts C&I economics (per block)
+// Revenue from the simulated usable energy each year, at the AC boundary:
+//  ConnectedSolutions Daily Dispatch pays $/kW on average kW held over events (National Grid/Mass Save program materials);
+//  Eversource G-2 demand charges on the monthly 15-min peak; Clean Peak CPECs per MWh discharged in peak windows
+//  (ACP $65 for 2026-2032, $45 after; CPECs clear ~87% of ACP). Battery losses are bought at the energy price.
+function econPack(x, mode, p) {
+  const ac = p.acEff / 100, lifeM = Math.round(x.life / DT), nYears = Math.ceil(lifeM / SPY);
+  const capex = p.sysCost * p.blockKWh * (1 + (mode === "cell" ? p.bmsOverhead / 100 : 0)) * (1 - p.itc / 100);
+  let npv = -capex, cum = -capex, payback = NaN, y1 = null, mwhAC = 0;
+  for (let y = 0; y < nYears; y++) {
+    let e = 0, av = 0, n = 0;
+    for (let k = y * SPY; k < Math.min((y + 1) * SPY, lifeM); k++) { e += x.energy[k]; av += x.availM[k]; n++; }
+    if (!n) break;
+    const frac = n / SPY, E = e / n * ac, A = av / n;          // kWh per discharge (AC), availability
+    const cs = p.csRate * Math.min(p.ratedKW, E / p.csHrs) * A * (frac >= 0.75 ? 1 : frac);
+    const dc = 12 * frac * p.dcRate * (p.dcRealize / 100) * Math.min(p.ratedKW, E / p.dcHrs) * A;
+    const yr = p.startYear + y, acp = yr <= 2032 ? 65 : 45;
+    const cps = (p.cpsClear / 100) * acp * p.cpsMult * (E / 1000) * Math.max(p.cpy - p.csEvents, 0) * frac * A;
+    const mwh = (E / 1000) * p.cpy * frac * A;
+    const loss = mwh * (100 / p.rte - 1) * p.energyPrice * 1000;
+    const net = cs + dc + cps - loss;
+    mwhAC += mwh;
+    npv += net / Math.pow(1 + p.discount / 100, y + 1);
+    const prev = cum; cum += net; if (isNaN(payback) && cum >= 0) payback = y + (net > 0 ? -prev / net : 0);
+    if (y === 0) y1 = { cs, dc, cps, loss, net };
+  }
+  return { npv, capex, payback, y1, mwhAC };
+}
 function pct(arr, q) { const a = Float64Array.from(arr).sort(); const i = (a.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i); return a[lo] + (a[hi] - a[lo]) * (i - lo); }
+const F64 = n => new Float64Array(n);
 function runAll(p, packs, withBands) {
-  const out = {};
+  const out = {}, res = {};
   for (const mode of ["fixed", "cell"]) {
-    const res = []; for (let pk = 0; pk < packs; pk++) res.push(simPack(p, mode, pk, pk === 0));
-    const o = { life: pct(res.map(r => r.life), 0.5), mwh: pct(res.map(r => r.mwh), 0.5), visits: pct(res.map(r => r.visits), 0.5),
-      avail: res.reduce((s, r) => s + r.avail, 0) / packs, iso: res.reduce((s, r) => s + r.nIso, 0) / packs, tr: res[0].tr };
+    const r = []; for (let pk = 0; pk < packs; pk++) r.push(simPack(p, mode, pk, pk === 0));
+    res[mode] = r;
+    const o = { life: pct(r.map(x => x.life), 0.5), mwh: pct(r.map(x => x.mwh), 0.5), visits: pct(r.map(x => x.visits), 0.5),
+      avail: r.reduce((s, x) => s + x.avail, 0) / packs, iso: r.reduce((s, x) => s + x.nIso, 0) / packs,
+      rest: r.reduce((s, x) => s + x.restSteps, 0) / packs, tr: r[0].tr,
+      kw: F64(K), bp: F64(K) };
+    for (let k = 0; k < K; k++) { o.kw[k] = pct(r.map(x => x.firmKW[k]), 0.5); o.bp[k] = pct(r.map(x => x.bpow[k]), 0.5); }
     if (withBands) {
       o.p10 = F64(K), o.p50 = F64(K), o.p90 = F64(K);
-      for (let k = 0; k < K; k++) { const v = res.map(r => r.energy[k] / BLOCK_KWH); o.p10[k] = pct(v, 0.1); o.p50[k] = pct(v, 0.5); o.p90[k] = pct(v, 0.9); }
+      for (let k = 0; k < K; k++) { const v = r.map(x => x.ret[k]); o.p10[k] = pct(v, 0.1); o.p50[k] = pct(v, 0.5); o.p90[k] = pct(v, 0.9); }
     }
     out[mode] = o;
   }
+  // paired (same initial cells) gain in lifetime energy, for the switch-cost metric
+  out.dMWh = pct(res.cell.map((x, i) => x.mwh - res.fixed[i].mwh), 0.5);
+  // economics and environment, per block, medians over packs (and paired differences)
+  const ef = res.fixed.map(x => econPack(x, "fixed", p)), ec = res.cell.map(x => econPack(x, "cell", p));
+  const med = (a, f) => pct(a.map(f), 0.5);
+  out.econ = {
+    fixed: { npv: med(ef, e => e.npv), capex: ef[0].capex, payback: med(ef, e => isNaN(e.payback) ? 99 : e.payback), mwhAC: med(ef, e => e.mwhAC),
+      cs: med(ef, e => e.y1.cs), dc: med(ef, e => e.y1.dc), cps: med(ef, e => e.y1.cps), loss: med(ef, e => e.y1.loss), net: med(ef, e => e.y1.net) },
+    cell: { npv: med(ec, e => e.npv), capex: ec[0].capex, payback: med(ec, e => isNaN(e.payback) ? 99 : e.payback), mwhAC: med(ec, e => e.mwhAC),
+      cs: med(ec, e => e.y1.cs), dc: med(ec, e => e.y1.dc), cps: med(ec, e => e.y1.cps), loss: med(ec, e => e.y1.loss), net: med(ec, e => e.y1.net) },
+    dNPV: pct(ec.map((e, i) => e.npv - ef[i].npv), 0.5), dNPVp10: pct(ec.map((e, i) => e.npv - ef[i].npv), 0.1), dNPVp90: pct(ec.map((e, i) => e.npv - ef[i].npv), 0.9),
+    dMWhAC: pct(ec.map((e, i) => e.mwhAC - ef[i].mwhAC), 0.5),
+  };
   return out;
+  
 }
-const F64 = n => new Float64Array(n);
 
 // ---------------------------------------------------------------- controls
 const GROUPS = [
   { id: "pack", title: "Pack and system limits", tag: "", open: true, items: [
-    { id: "k", label: "Bypass headroom k (cells the voltage window lets drop out)", min: 0, max: 48, step: 1, fmt: v => `${v} cells` },
+    { id: "k", label: "Bypass headroom k (cells the voltage window lets drop out)", min: 0, max: 48, step: 1, fmt: v => `${v} cells`, note: "Ask REON for the real value." },
     { id: "N", label: "Cells in series", min: 16, max: 192, step: 8, fmt: v => `${v}` },
-    { id: "eff", label: "Switch efficiency", min: 97, max: 100, step: 0.1, fmt: v => `${v.toFixed(1)}%` },
-    { id: "retire", label: "Retire below (share of nameplate energy)", min: 50, max: 90, step: 1, fmt: v => `${v}%` },
     { id: "cpy", label: "Cycles per year", min: 50, max: 730, step: 5, fmt: v => `${v}` },
   ] },
+  { id: "metrics", title: "Outputs and retirement", tag: "", open: true, items: [
+    { id: "retire", label: "Retire below this retention", min: 50, max: 90, step: 1, fmt: v => `${v}%` },
+    { type: "choice", id: "denom", label: "Retention measured against", options: [["nameplate", "Nameplate energy"], ["bol", "This design's beginning-of-life energy (brief's R_sys)"]] },
+    { id: "ratedKW", label: "Inverter power rating", min: 10, max: 60, step: 1, fmt: v => `${v} kW` },
+    { id: "duration", label: "Committed event duration (firm kW must last this long)", min: 0.5, max: 4, step: 0.25, fmt: v => `${v} h` },
+  ] },
+  { id: "app", title: "Application: Massachusetts C&I site", tag: "cal", tagText: "sourced", open: false, items: [
+    { id: "nBlocks", label: "REON EBS blocks at the site (30 kW / 60 kWh each)", min: 1, max: 10, step: 1, fmt: v => `${v} = ${v * 30} kW / ${v * 60} kWh`, note: "Default 2, to clear the ≥50 kW size an aggregator lists for C&I ConnectedSolutions (official materials state no minimum; ask REON)." },
+    { id: "csRate", label: "ConnectedSolutions Daily Dispatch", min: 0, max: 300, step: 5, fmt: v => `$${v}/kW-summer`, note: "Mass Save / National Grid C&I program materials: $200/kW, paid on average kW over 30–60 events of 2–3 h, 2–7 pm, Jun–Sep." },
+    { id: "csHrs", label: "Event length the battery must hold", min: 2, max: 3, step: 0.5, fmt: v => `${v} h`, note: "Events run 2–3 h; 3 h is the conservative case." },
+    { id: "dcRate", label: "Demand charge", min: 5, max: 45, step: 0.05, fmt: v => `$${v.toFixed(2)}/kW-month`, note: "Eversource Greater Boston G-2: $20.21 distribution + $13.74 transmission = $33.95 (Jul 2026). National Grid G-2: $15.06." },
+    { id: "dcHrs", label: "Peak-shaving duration", min: 1, max: 4, step: 0.5, fmt: v => `${v} h`, note: "Placeholder: how long the site's monthly peak lasts. Set from a ComStock load profile." },
+    { id: "dcRealize", label: "Share of theoretical demand savings realized", min: 30, max: 100, step: 5, fmt: v => `${v}%`, note: "Placeholder: forecasting misses and coincident peaks." },
+    { id: "cpsClear", label: "Clean Peak certificate price, share of ACP", min: 50, max: 100, step: 1, fmt: v => `${v}%`, note: "ACP $65/MWh 2026–2032, $45 after (mass.gov). CPECs have cleared ~87% of ACP (Modo Energy)." },
+    { id: "cpsMult", label: "Clean Peak multiplier", min: 0.5, max: 2, step: 0.1, fmt: v => `${v.toFixed(1)}×`, note: "Merchant storage earns 1.0–2.0× (Modo). 1.0 is conservative. No double-counting with ConnectedSolutions event days." },
+    { id: "energyPrice", label: "Energy price (cost of battery losses)", min: 0.05, max: 0.40, step: 0.01, fmt: v => `$${v.toFixed(2)}/kWh`, note: "National Grid commercial Basic Service ~21.7 ¢/kWh (Jan 2026)." },
+    { id: "rte", label: "Round-trip efficiency", min: 70, max: 98, step: 1, fmt: v => `${v}%`, note: "Placeholder; ask REON." },
+    { id: "acEff", label: "Inverter efficiency (DC to AC boundary)", min: 90, max: 99, step: 0.5, fmt: v => `${v}%`, note: "Placeholder. All kW, kWh and $ are at the AC meter, as the brief asks." },
+    { id: "sysCost", label: "Installed system cost", min: 200, max: 1000, step: 10, fmt: v => `$${v}/kWh`, note: "Placeholder. Installer data for small MA C&I: ~$500–800/kWh installed. Ask REON." },
+    { id: "itc", label: "Federal investment tax credit", min: 0, max: 40, step: 5, fmt: v => `${v}%`, note: "Storage keeps the ITC for projects starting construction by 2033, subject to FEOC sourcing rules (cell origin: ask REON)." },
+    { id: "discount", label: "Discount rate", min: 3, max: 15, step: 0.5, fmt: v => `${v}%` },
+    { id: "startYear", label: "First year of operation", min: 2026, max: 2030, step: 1, fmt: v => `${v}` },
+    { id: "gridCO2", label: "Grid CO₂ displaced by delivered energy", min: 200, max: 1200, step: 10, fmt: v => `${v} lb/MWh`, note: "ISO-NE 2024 average: 597 lb/MWh. Peak marginal units emit more, so this is conservative. Assumes the battery charges from on-site solar." },
+    { id: "embodiedCO2", label: "Embodied CO₂ of new cells", min: 30, max: 150, step: 1, fmt: v => `${v} kg/kWh`, note: "Fraunhofer comparative LCA (2025): sodium-ion 75–87, LFP 58–92 kg CO₂e/kWh cell. Replace with REON's LCA." },
+    { id: "cellKgPerKWh", label: "Cell mass", min: 3, max: 15, step: 0.5, fmt: v => `${v} kg/kWh`, note: "Placeholder; ask REON for the EBS cell mass." },
+    { id: "horizon", label: "Years of storage service the owner needs", min: 10, max: 30, step: 1, fmt: v => `${v} y`, note: "For cells avoided: replacements needed over this horizon at each design's service life." },
+  ] },
+  { id: "switch", title: "Cost of cell-level control", tag: "ph", tagText: "ask REON", open: true, items: [
+    { id: "eff", label: "Switch efficiency", min: 97, max: 100, step: 0.1, fmt: v => `${v.toFixed(1)}%`, note: "Placeholder: conduction loss of the per-cell switches." },
+    { id: "bmsOverhead", label: "Extra cost of REON's cell-level BMS, share of system cost", min: 0, max: 12, step: 0.5, fmt: v => `+${v.toFixed(1)}%`, note: "From Tim Ren (Discord): REON's BMS costs about 3× a conventional BMS, and a BMS is 2–3% of system cost, so +4–6%. Sets the break-even line on the charts." },
+
+  ] },
   { id: "policy", title: "Control policy: when to bypass", tag: "", open: true, items: [
-    { type: "toggle", id: "bypassOnEmpty", label: "Bypass a cell when it empties", note: "The string runs on until headroom is used up." },
-    { type: "toggle", id: "bypassOnFault", label: "Bypass a faulted cell", note: "Off: any fault stops the string until a technician swaps the cell." },
+    { type: "toggle", id: "bypassOnEmpty", label: "Bypass a cell when it empties", note: "Capacity recovery: the string runs on until headroom is used up." },
+    { type: "toggle", id: "bypassOnFault", label: "Bypass a faulted cell", note: "Only matters when sudden faults are on." },
+    { id: "restCount", label: "Lifetime optimization: max cells rested per month", min: 0, max: 8, step: 1, fmt: v => v ? `${v} cells` : "off", needs: "est" },
+    { type: "choice", id: "restRule", label: "Rank cells to rest by", options: [["life", "Predicted remaining life (own fade trend + pack prior)"], ["health", "Health gap to the pack mean"]], needs: "rest" },
+    { id: "restThresh", label: "Rest a cell when its remaining life is this far below the pack median", min: 0, max: 80, step: 5, fmt: v => `${v}%`, needs: "ruleLife" },
+    { id: "restGap", label: "Rest a cell estimated this far below the pack mean", min: 0, max: 5, step: 0.25, fmt: v => `${v.toFixed(2)} pts`, needs: "ruleHealth" },
+    { id: "restStop", label: "Stop resting once the pack's measured health falls to", min: 70, max: 100, step: 1, fmt: v => v >= 100 ? "never rest" : `${v}%`, needs: "rest", note: "Resting is a pre-knee tool. Late in life the headroom is worth more for bypass on empty." },
+    { id: "restTemp", label: "Rest a cell measured this much hotter than the pack (any point in life)", min: 0, max: 6, step: 0.5, fmt: v => v ? `${v.toFixed(1)} °C` : "off", needs: "temperature", note: "REON's BMS can bypass a hot cell and let it rest (Tim Ren, Discord). Low thresholds rest cells constantly and cost energy." },
     { id: "isolateGap", label: "Isolate a cell estimated this far below pack average", min: 0, max: 20, step: 0.5, fmt: v => v ? `${v.toFixed(1)} pts` : "off", needs: "est" },
     { id: "isoTemp", label: "Isolate a cell running this much hotter", min: 0, max: 10, step: 0.5, fmt: v => v ? `${v.toFixed(1)} °C` : "off", needs: "temperature" },
     { id: "isoRes", label: "Isolate a cell with resistance this far above median", min: 0, max: 100, step: 5, fmt: v => v ? `${v}%` : "off", needs: "resistance" },
-    { id: "restCount", label: "Rest the weakest cells each month", min: 0, max: 16, step: 1, fmt: v => v ? `${v} cells` : "off", needs: "est" },
-    { id: "spare", label: "Bypass slots kept free for faults", min: 0, max: 8, step: 1, fmt: v => `${v}` },
+    { id: "spare", label: "Bypass slots kept free (not used for resting or isolation)", min: 0, max: 8, step: 1, fmt: v => `${v}` },
   ] },
   { id: "mon", title: "Per-cell monitoring", tag: "", open: false, type: "signals" },
-  { id: "aging", title: "Cell aging", tag: "cal", tagText: "calibrated", open: false, items: [
+  { id: "aging", title: "Cell aging (chemistry-agnostic)", tag: "cal", tagText: "calibrated", open: false, items: [
+    { id: "spreadMult", label: "Cell-to-cell spread, multiple of the calibrated spread", min: 0.25, max: 4, step: 0.05, fmt: v => `${v.toFixed(2)}×`, note: "Scales every within-pack spread below (fade rate, knee, post-knee slope, starting capacity, resistance). 1× = the paper's NMC cells. Set it for your chemistry and binning." },
+    { id: "outlierFrac", label: "Share of early-knee outlier cells", min: 0, max: 0.2, step: 0.005, fmt: v => `${(v * 100).toFixed(1)}%`, note: "Paper: cells with less favourable initial conditions or harsher local history reach the ageing knee earlier. Data: the weakest cell sits 3.05 SDs below the mean at 280k km vs 2.77 in the model, so a small share is consistent." },
+    { id: "outlierKnee", label: "Outlier knee timing, share of normal", min: 0.5, max: 1, step: 0.01, fmt: v => `${(v * 100).toFixed(0)}%` },
     { id: "rateCV", label: "Spread of pre-knee fade rate (CV)", min: 0, max: 0.8, step: 0.01, fmt: v => v.toFixed(2), note: "Fitted: 0.38" },
     { id: "kneeCV", label: "Spread of knee timing within a pack (CV)", min: 0, max: 0.3, step: 0.005, fmt: v => v.toFixed(3), note: "Fitted: 0.044. Cells knee almost together." },
     { id: "slopeCV", label: "Spread of post-knee slope (CV)", min: 0, max: 0.8, step: 0.01, fmt: v => v.toFixed(2), note: "Fitted: 0.35" },
@@ -411,15 +633,17 @@ const GROUPS = [
     { id: "tempSD", label: "Cell temperature spread in the rack", min: 0, max: 6, step: 0.1, fmt: v => `${v.toFixed(1)} °C`, note: "Assumption" },
     { type: "toggle", id: "kneeAuto", label: "Place the knee where the mean cell has lost 7.5%", note: "As in the EV data. Off: set the knee year below." },
     { id: "kneeYears", label: "Knee onset (years)", min: 2, max: 18, step: 0.1, fmt: v => `${v.toFixed(1)} y`, needs: "manualKnee" },
-    { id: "kCal", label: "Calendar fade per √year", min: 0, max: 0.05, step: 0.001, fmt: v => `${(v * 100).toFixed(1)}%`, note: "Assumption" },
+    { id: "kCal", label: "Calendar fade per √year", min: 0, max: 0.05, step: 0.001, fmt: v => `${(v * 100).toFixed(1)}%`, note: "Assumption. A large calendar share limits what resting can buy." },
     { id: "kCyc", label: "Fade per million cycles", min: 0, max: 40, step: 0.5, fmt: v => `${v.toFixed(1)} ×1e-6`, note: "Assumption (×1e-6 per full cycle)" },
     { type: "toggle", id: "throughput", label: "Cycle aging follows each cell's own use", note: "Resting or bypassing a cell slows its cycle aging." },
   ] },
-  { id: "faults", title: "Sudden faults", tag: "ph", tagText: "placeholder", open: false, items: [
-    { id: "faultRate", label: "Base fault rate per 1000 cell-years", min: 0, max: 10, step: 0.1, fmt: v => v.toFixed(1) },
-    { id: "faultSoh", label: "Fault risk rise for cells weaker than the pack", min: 0, max: 30, step: 0.5, fmt: v => v.toFixed(1), note: "Log-rate per unit of SOH below pack mean: 10 means 2.7× the risk at 10 points below" },
-    { id: "repairDays", label: "Outage per service visit", min: 0, max: 60, step: 1, fmt: v => `${v} days` },
-    { id: "packs", label: "Simulated packs (more is smoother, slower)", min: 8, max: 160, step: 8, fmt: v => `${v}` },
+  { id: "faults", title: "Sudden faults (not in the paper's data)", tag: "ph", tagText: "placeholder", open: false, items: [
+    { id: "faultRate", label: "Base fault rate per 1000 cell-years", min: 0, max: 10, step: 0.1, fmt: v => v ? v.toFixed(1) : "off", note: "Off by default. The paper and field experience describe slow drift into a knee, not sudden failures; it has no fault events to calibrate on." },
+    { id: "faultSoh", label: "Fault risk rise for cells weaker than the pack", min: 0, max: 30, step: 0.5, fmt: v => v.toFixed(1), needs: "faults" },
+    { id: "repairDays", label: "Outage per service visit", min: 0, max: 60, step: 1, fmt: v => `${v} days`, needs: "faults" },
+  ] },
+  { id: "run", title: "Simulation", tag: "", open: false, items: [
+    { id: "packs", label: "Simulated packs (more is smoother, slower)", min: 8, max: 160, step: 8, fmt: v => `${v}`, note: "The browser default (48) is noisy by ±1–2 points. Slide numbers come from the Python model at 300+ packs, which this matches at equal settings." },
   ] },
 ];
 const SIGNALS = [
@@ -441,7 +665,7 @@ function buildControls() {
     d.innerHTML = `<summary><span class="t">${g.title}</span>${g.tagText ? `<span class="tag ${g.tag}">${g.tagText}</span>` : ""}</summary><div class="gbody"></div>`;
     const body = d.querySelector(".gbody");
     if (g.type === "signals") {
-      body.innerHTML = `<p class="hint">Switch a signal off or add noise; the controller only sees what is measured. Cells' true aging and faults do not change.</p>`;
+      body.innerHTML = `<p class="hint">Switch a signal off or add noise; the controller only sees what is measured. Cells' true aging does not change.</p>`;
       for (const [id, name, unit, use] of SIGNALS) {
         const row = document.createElement("div"); row.className = "sig";
         row.innerHTML = `<input type="checkbox" id="sig-${id}-on" ${P.sig[id].on ? "checked" : ""} aria-label="${name} measured">
@@ -459,6 +683,12 @@ function buildControls() {
           el.innerHTML = `<input type="checkbox" id="c-${it.id}" ${P[it.id] ? "checked" : ""}><span>${it.label}${it.note ? `<small>${it.note}</small>` : ""}</span>`;
           el.querySelector("input").addEventListener("change", e => { P[it.id] = e.target.checked; changed(); });
           body.appendChild(el);
+        } else if (it.type === "choice") {
+          const el = document.createElement("fieldset"); el.className = "choice"; el.id = `w-${it.id}`;
+          el.innerHTML = `<legend>${it.label}</legend>` + it.options.map(([v, lab]) =>
+            `<label><input type="radio" name="c-${it.id}" value="${v}" ${P[it.id] === v ? "checked" : ""}> ${lab}</label>`).join("");
+          el.querySelectorAll("input").forEach(inp => inp.addEventListener("change", e => { if (e.target.checked) { P[it.id] = e.target.value; changed(); } }));
+          body.appendChild(el);
         } else {
           const el = document.createElement("div"); el.className = "ctl"; el.id = `w-${it.id}`;
           el.innerHTML = `<label for="c-${it.id}">${it.label}</label><output id="o-${it.id}" for="c-${it.id}">${it.fmt(P[it.id])}</output>
@@ -472,17 +702,31 @@ function buildControls() {
   }
   const reset = document.createElement("button"); reset.type = "button"; reset.textContent = "Reset to defaults";
   reset.addEventListener("click", () => { P = clone(DEFAULTS); buildControls(); changed(); });
-  rail.appendChild(reset);
+  const best = document.createElement("button"); best.type = "button"; best.textContent = "Compare: bypass on empty only (no resting)";
+  best.addEventListener("click", () => { P = Object.assign(clone(DEFAULTS), { restCount: 0 }); buildControls(); changed(); });
+  const btns = document.createElement("div"); btns.style.cssText = "display:flex;flex-wrap:wrap;gap:8px"; btns.append(reset, best);
+  rail.appendChild(btns);
   syncAvailability();
 }
 function canEst(p) { const s = p.sig; return s.capacity.on || s.soh.on || s.soc.on || s.ocv.on || s.voltage.on; }
+function needOk(n) {
+  switch (n) {
+    case "est": return canEst(P);
+    case "rest": return canEst(P) && P.restCount > 0;
+    case "ruleLife": return canEst(P) && P.restCount > 0 && P.restRule === "life";
+    case "ruleHealth": return canEst(P) && P.restCount > 0 && P.restRule === "health";
+    case "manualKnee": return !P.kneeAuto;
+    case "faults": return P.faultRate > 0;
+    default: return P.sig[n].on;
+  }
+}
 function syncAvailability() {
   const kIn = document.getElementById("c-k"); if (kIn) { kIn.max = String(Math.min(P.N - 1, 95)); if (P.k > P.N - 1) { P.k = P.N - 1; kIn.value = P.k; } }
   for (const g of GROUPS) for (const it of (g.items || [])) {
     const w = document.getElementById(`w-${it.id}`); if (!w || !it.needs) continue;
-    const ok = it.needs === "est" ? canEst(P) : it.needs === "manualKnee" ? !P.kneeAuto : P.sig[it.needs].on;
+    const ok = needOk(it.needs);
     w.classList.toggle("off", !ok);
-    const inp = w.querySelector("input"); if (inp) inp.disabled = !ok;
+    w.querySelectorAll("input").forEach(inp => { inp.disabled = !ok; });
   }
   const warn = document.getElementById("estWarn"); if (warn) warn.hidden = canEst(P);
 }
@@ -493,22 +737,60 @@ function fmtD(v, unit, digits = 1, invert = false) {
   if (!isFinite(v) || Math.abs(v) < Math.pow(10, -digits) / 2) return `<span class="zero">no change</span>`;
   const good = invert ? v < 0 : v > 0; return `<span class="${good ? "pos" : "neg"}">${v > 0 ? "+" : "−"}${Math.abs(v).toFixed(digits)}${unit}</span>`;
 }
-function renderKPIs(cur, def) {
+function renderKPIs(cur, def, k) {
   const f = cur.fixed, c = cur.cell, df = def.fixed, dc = def.cell;
   const life = x => x >= YEARS - 1e-9 ? `>${YEARS}` : x.toFixed(1);
   const gainE = 100 * (c.mwh / f.mwh - 1), gainL = 100 * (c.life / f.life - 1);
   const dGainE = gainE - 100 * (dc.mwh / df.mwh - 1);
+  const yr = (k * DT).toFixed(1);
   const items = [
     { lab: "Service life (years)", f: life(f.life), c: life(c.life), d: `${fmtD(c.life - f.life, " y", 2)} vs fixed (${gainL >= 0 ? "+" : ""}${gainL.toFixed(1)}%)`, dd: fmtD(c.life - dc.life, " y vs defaults", 2) },
     { lab: "Lifetime energy (MWh)", f: f.mwh.toFixed(0), c: c.mwh.toFixed(0), d: `${fmtD(gainE, "%", 1)} vs fixed`, dd: `${fmtD(dGainE, " pts of gain vs defaults", 1)}` },
-    { lab: "Service outages over life", f: f.visits.toFixed(0), c: c.visits.toFixed(0), d: fmtD(c.visits - f.visits, " vs fixed", 0, true), dd: fmtD(c.visits - dc.visits, " vs defaults", 0, true) },
-    { lab: "Availability", f: `${(100 * f.avail).toFixed(1)}%`, c: `${(100 * c.avail).toFixed(2)}%`, d: fmtD(100 * (c.avail - f.avail), " pts vs fixed", 2), dd: c.iso > 0.05 ? `<span class="zero">${c.iso.toFixed(1)} cells isolated per pack</span>` : fmtD(100 * (c.avail - dc.avail), " pts vs defaults", 2) },
+    { lab: `Firm kW for ${P.duration} h, year ${yr}`, f: f.kw[k].toFixed(1), c: c.kw[k].toFixed(1), d: `${fmtD(c.kw[k] - f.kw[k], " kW vs fixed", 1)}`, dd: `<span class="zero">min(rating, usable kWh ÷ ${P.duration} h); 0 once retired</span>` },
+    { lab: `Power utilisation βpower, year ${yr}`, f: isFinite(f.bp[k]) ? f.bp[k].toFixed(3) : "–", c: isFinite(c.bp[k]) ? c.bp[k].toFixed(3) : "–", d: fmtD(c.bp[k] - f.bp[k], " vs fixed", 3), dd: `<span class="zero">paper fleet: 0.871 cars, 0.849 buses</span>` },
   ];
   $("kpis").innerHTML = items.map(it => `<div class="kpi"><div class="lab">${it.lab}</div>
     <div class="pair"><span class="f" title="Fixed string">${it.f}</span><span class="c" title="Cell-level control">${it.c}</span></div>
     <div class="d">${it.d}</div><div class="d">${it.dd}</div></div>`).join("");
+  const sec = [];
+  sec.push(`<span><b>Break-even</b> energy gain must exceed the +${P.bmsOverhead.toFixed(1)}% BMS overhead; now ${gainE >= 0 ? "+" : ""}${gainE.toFixed(1)}%</span>`);
+  if (P.restCount > 0) sec.push(`<span><b>Resting</b> ${c.rest.toFixed(0)} cell-months per pack over life</span>`);
+  if (c.iso > 0.05) sec.push(`<span><b>Isolated</b> ${c.iso.toFixed(1)} cells per pack</span>`);
+  if (P.faultRate > 0) sec.push(`<span><b>Outages (placeholder faults)</b> fixed ${f.visits.toFixed(0)} · cell ${c.visits.toFixed(0)}</span><span><b>Availability</b> fixed ${(100 * f.avail).toFixed(2)}% · cell ${(100 * c.avail).toFixed(2)}%</span>`);
+  $("kpis2").innerHTML = sec.join("");
 }
 
+const money = v => `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+function renderEcon(cur) {
+  const e = cur.econ, n = P.nBlocks, f = e.fixed, c = e.cell;
+  const row = (lab, a, b, fmt = money, note = "", lowerIsBetter = false) => {
+    const d = b - a, good = lowerIsBetter ? d < 0 : d > 0;
+    return `<tr><td>${lab}${note ? `<small>${note}</small>` : ""}</td><td class="num">${fmt(a)}</td><td class="num cellc">${fmt(b)}</td><td class="num ${Math.abs(d) < 1e-9 ? "zero" : good ? "pos" : "neg"}">${Math.abs(d) < 1e-9 ? "—" : (d > 0 ? "+" : "") + fmt(d).replace("−", "−")}</td></tr>`;
+  };
+  const yrs = v => v >= 98 ? "n/a" : `${v.toFixed(1)} y`;
+  const lifeF = cur.fixed.life, lifeC = cur.cell.life, kWh = P.blockKWh * n;
+  const avoidKWh = kWh * P.horizon * (1 / Math.max(lifeF, 0.1) - 1 / Math.max(lifeC, 0.1));
+  const opCO2 = e.dMWhAC * n * P.gridCO2 * 0.000453592; // t
+  const embCO2 = avoidKWh * P.embodiedCO2 / 1000;          // t
+  const mass = avoidKWh * P.cellKgPerKWh;                    // kg
+  const capPerF = (f.capex * n) / (f.mwhAC * n), capPerC = (c.capex * n) / (c.mwhAC * n);
+  $("econTitle").textContent = `Value for a Massachusetts C&I owner: ${n} × REON EBS (${n * 30} kW / ${kWh} kWh), Eversource G-2, from ${P.startYear}`;
+  $("econBody").innerHTML = `<table class="econ"><thead><tr><th></th><th class="num">Fixed string</th><th class="num cellc">Cell-level control</th><th class="num">Difference</th></tr></thead><tbody>
+    ${row("Installed cost after ITC", f.capex * n, c.capex * n, money, `incl. +${P.bmsOverhead}% REON BMS overhead`, true)}
+    ${row("Year 1: ConnectedSolutions", f.cs * n, c.cs * n)}
+    ${row("Year 1: demand-charge savings", f.dc * n, c.dc * n)}
+    ${row("Year 1: Clean Peak certificates", f.cps * n, c.cps * n)}
+    ${row("Year 1: cost of battery losses", -f.loss * n, -c.loss * n)}
+    ${row("Year 1 net value", f.net * n, c.net * n)}
+    ${row("Simple payback", f.payback, c.payback, yrs, "", true)}
+    ${row("NPV over service life", f.npv * n, c.npv * n, money, `${P.discount}% discount; life ${lifeF.toFixed(1)} vs ${lifeC.toFixed(1)} y`)}
+    ${row("Energy delivered over life (AC)", f.mwhAC * n, c.mwhAC * n, v => `${v.toFixed(0)} MWh`)}
+    ${row("Installed cost per delivered MWh", capPerF, capPerC, money, "", true)}
+    </tbody></table>
+    <p class="econsum"><b>NPV gain from cell-level control:</b> <span class="${e.dNPV > 0 ? "pos" : "neg"}">${money(e.dNPV * n)}</span> per site (P10 ${money(e.dNPVp10 * n)}, P90 ${money(e.dNPVp90 * n)}; paired, same cells)
+    · <b>CO₂ avoided:</b> ${opCO2.toFixed(1)} t from extra delivered energy + ${embCO2.toFixed(1)} t of cell manufacturing avoided over ${P.horizon} y
+    · <b>Material kept out of waste:</b> ${(mass).toFixed(0)} kg of cells (${avoidKWh.toFixed(0)} kWh of replacement capacity not built)</p>`;
+}
 function polar(cx, cy, r, a) { return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
 function renderRing(svg, tr, k, N, isCell, summaryEl) {
   const cx = 180, cy = 180, hub = 52, rMax = 168, lo = 0.5, hi = 1.0;
@@ -516,26 +798,28 @@ function renderRing(svg, tr, k, N, isCell, summaryEl) {
   const stop = tr.stop[k];
   const parts = [];
   for (const g of [0.6, 0.7, 0.8, 0.9, 1.0]) parts.push(`<circle cx="${cx}" cy="${cy}" r="${rad(g).toFixed(1)}" fill="none" stroke="var(--rule)" stroke-width="0.6"/>`);
-  let usable = 0, stranded = 0, nRest = 0, nOut = 0;
+  let stranded = 0, nRest = 0, nOut = 0, qMin = Infinity, qSum = 0, qN = 0;
   const w = Math.max(1, Math.min(3.2, 520 / N));
   for (let i = 0; i < N; i++) {
     const q = tr.Q[k * N + i], st = tr.st[k * N + i], a = -Math.PI / 2 + 2 * Math.PI * i / N;
     const [x0, y0] = polar(cx, cy, hub, a), [x1, y1] = polar(cx, cy, rad(q), a);
     if (st >= 2) { nOut++; parts.push(`<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="var(--fault)" stroke-width="${w * 0.7}" stroke-dasharray="2 2" opacity="0.8"/>`); continue; }
+    qMin = Math.min(qMin, q); qSum += q; qN++;
     if (st === 1) { nRest++; parts.push(`<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="var(--rest)" stroke-width="${w}"/>`); stranded += q; continue; }
-    const u = Math.min(q, stop); usable += u; stranded += q - u;
+    const u = Math.min(q, stop); stranded += q - u;
     const [xu, yu] = polar(cx, cy, rad(u), a);
     parts.push(`<line x1="${x0}" y1="${y0}" x2="${xu}" y2="${yu}" stroke="${isCell ? "var(--cell)" : "var(--fixed)"}" stroke-width="${w}"/>`);
     if (q > u + 1e-6) parts.push(`<line x1="${xu}" y1="${yu}" x2="${x1}" y2="${y1}" stroke="var(--stranded)" stroke-width="${w}"/>`);
   }
   parts.push(`<circle cx="${cx}" cy="${cy}" r="${rad(stop).toFixed(1)}" fill="none" stroke="var(--ink)" stroke-width="1.1" stroke-dasharray="4 3"/>`);
-  const share = tr.cap[k] / BLOCK_KWH * 100;
+  const share = tr.cap[k] / P.blockKWh * 100;
   parts.push(`<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="22" fill="var(--ink)">${share.toFixed(0)}%</text>`);
   parts.push(`<text x="${cx}" y="${cy + 16}" text-anchor="middle" font-size="10.5" fill="var(--muted)">usable</text>`);
   parts.push(`<text x="${cx + 4}" y="${cy - rad(1.0) + 11}" font-size="9.5" fill="var(--muted)">100%</text><text x="${cx + 4}" y="${cy - rad(0.7) + 11}" font-size="9.5" fill="var(--muted)">70%</text>`);
   svg.innerHTML = parts.join("");
-  const scale = BLOCK_KWH / N / 1; // kWh per unit capacity per cell, approx
-  summaryEl.innerHTML = `usable ${tr.cap[k].toFixed(1)} kWh · stranded ${(stranded * scale).toFixed(1)} kWh` +
+  const scale = P.blockKWh / N;
+  const bSOH = qN ? qMin / (qSum / qN) : NaN;
+  summaryEl.innerHTML = `usable ${tr.cap[k].toFixed(1)} kWh · stranded ${(stranded * scale).toFixed(1)} kWh · βSOH ${bSOH.toFixed(3)}` +
     (isCell ? `<br>${nOut} bypassed or isolated · ${nRest} resting` : `<br>stops at its weakest cell`);
 }
 
@@ -556,21 +840,27 @@ function renderRetention(cur, def, k) {
   parts.push(`<line x1="${x(k * DT)}" x2="${x(k * DT)}" y1="${T}" y2="${H - B}" stroke="var(--ink)" stroke-width="0.8" opacity="0.5"/>`);
   const lx = L + 12; parts.push(`<rect x="${lx}" y="${y(0.48) - 4}" width="14" height="3" fill="var(--cell)"/><text x="${lx + 20}" y="${y(0.48)}" font-size="11.5" fill="var(--ink)">cell-level control</text><rect x="${lx}" y="${y(0.44) - 4}" width="14" height="3" fill="var(--fixed)"/><text x="${lx + 20}" y="${y(0.44)}" font-size="11.5" fill="var(--ink)">fixed string</text>`);
   svg.innerHTML = parts.join("");
+  $("retCap").textContent = `Median (line) and P10 to P90 range (band) over the simulated packs, as a share of ${P.denom === "bol" ? "each design's own beginning-of-life energy (the brief's R_sys)" : "nameplate energy"}. Dotted lines are the default settings, for comparison.`;
 }
 
-function renderSweep(rows) {
-  const svg = $("sweepChart"), W = 440, H = 330, L = 40, T = 26, B = 46;
+// generic bar chart: rows = [{label, gain, sub, on}]
+function renderBars(svgId, rows, xLabel) {
+  const svg = $(svgId), W = 440, H = 330, L = 40, T = 26, B = 46;
   if (!rows) { svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" font-size="12" fill="var(--muted)">Computing…</text>`; return; }
-  const peak = Math.max(5, ...rows.map(r => r.gain)) * 1.15, band = (W - L - 12) / rows.length, bw = band * 0.58;
+  const be = P.bmsOverhead;
+  const peak = Math.max(5, be, ...rows.map(r => r.gain)) * 1.18, band = (W - L - 12) / rows.length, bw = band * 0.58;
   const y = v => T + (H - T - B) * (1 - Math.max(0, v) / peak);
   const parts = [`<line x1="${L}" x2="${W - 12}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)"/>`];
+
   rows.forEach((r, i) => {
-    const x0 = L + i * band + (band - bw) / 2, on = r.k === P.k;
-    parts.push(`<rect x="${x0}" y="${y(r.gain)}" width="${bw}" height="${y(0) - y(r.gain)}" fill="${on ? "var(--cell)" : "var(--stranded)"}" rx="2"><title>k = ${r.k}: ${r.gain.toFixed(1)}% more lifetime energy</title></rect>`);
-    parts.push(`<text x="${x0 + bw / 2}" y="${y(r.gain) - 6}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink)">${r.gain >= 0 ? "+" : ""}${r.gain.toFixed(0)}%</text>`);
-    parts.push(`<text x="${x0 + bw / 2}" y="${H - B + 16}" text-anchor="middle" font-size="11" fill="${on ? "var(--ink)" : "var(--muted)"}" font-weight="${on ? 700 : 400}">${r.k}</text>`);
+    const x0 = L + i * band + (band - bw) / 2;
+    parts.push(`<rect x="${x0}" y="${y(r.gain)}" width="${bw}" height="${y(0) - y(r.gain)}" fill="${r.on ? "var(--cell)" : "var(--stranded)"}" rx="2"><title>${r.label}: ${r.gain.toFixed(1)}% more lifetime energy${r.sub ? ", " + r.sub : ""}</title></rect>`);
+    parts.push(`<text x="${x0 + bw / 2}" y="${y(r.gain) - (r.sub ? 18 : 6)}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink)">${r.gain >= 0 ? "+" : ""}${r.gain.toFixed(1)}%</text>`);
+    if (r.sub) parts.push(`<text x="${x0 + bw / 2}" y="${y(r.gain) - 6}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--muted)">${r.sub}</text>`);
+    parts.push(`<text x="${x0 + bw / 2}" y="${H - B + 16}" text-anchor="middle" font-size="11" fill="${r.on ? "var(--ink)" : "var(--muted)"}" font-weight="${r.on ? 700 : 400}">${r.label}</text>`);
   });
-  parts.push(`<text x="${(L + W - 12) / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">bypass headroom k (cells)</text>`);
+  parts.push(`<text x="${(L + W - 12) / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${xLabel}</text>`);
+  if (be > 0) parts.push(`<line x1="${L}" x2="${W - 12}" y1="${y(be)}" y2="${y(be)}" stroke="var(--fault)" stroke-dasharray="5 4"/><text x="${L}" y="${T - 10}" font-size="10.5" fill="var(--fault)">- - - break-even: +${be.toFixed(1)}% energy pays for the BMS overhead</text>`);
   svg.innerHTML = parts.join("");
 }
 
@@ -583,29 +873,45 @@ function renderTime() {
   renderRing($("ringFixed"), CUR.fixed.tr, k, P.N, false, $("rsFixed"));
   renderRing($("ringCell"), CUR.cell.tr, k, P.N, true, $("rsCell"));
   renderRetention(CUR, DEF, k);
+  renderKPIs(CUR, DEF, k);
   const err = CUR.cell.tr.estErr[k];
-  $("estOut").textContent = isFinite(err) ? `In year ${(k * DT).toFixed(1)} the controller knows each cell's capacity to ±${(100 * err).toFixed(2)} points (RMS).` : "";
+  const eo = $("estOut"); if (eo) eo.textContent = isFinite(err) ? `In year ${(k * DT).toFixed(1)} the controller knows each cell's capacity to ±${(100 * err).toFixed(2)} points (RMS).` : "";
+}
+// Paired gain (same initial cells) of a variant over the fixed string, medians over packs.
+function pairedGain(q, packs) {
+  const f = [], c = [], fl = [], cl = [];
+  for (let pk = 0; pk < packs; pk++) { const a = simPack(q, "fixed", pk, false), b = simPack(q, "cell", pk, false); f.push(a.mwh); c.push(b.mwh); fl.push(a.life); cl.push(b.life); }
+  return { gain: 100 * (pct(c, 0.5) / pct(f, 0.5) - 1), life: 100 * (pct(cl, 0.5) / pct(fl, 0.5) - 1) };
+}
+function runSweeps(token) {
+  const packs = Math.min(32, P.packs);
+  const jobs = [];
+  // 1. headroom k
+  const ks = [...new Set([2, 4, 8, 16, 32, P.N - 1].filter(k => k < P.N).concat(P.k > 0 ? [P.k] : []))].sort((a, b) => a - b);
+  const kRows = []; for (const kk of ks) jobs.push(() => { const g = pairedGain(Object.assign(clone(P), { k: kk }), packs); kRows.push({ label: String(kk), gain: g.gain, on: kk === P.k }); if (kRows.length === ks.length) renderBars("sweepChart", kRows, "bypass headroom k (cells)"); });
+  // 2. cell spread
+  const ss = [...new Set([0.5, 1, 1.5, 2, 3, +P.spreadMult.toFixed(2)])].sort((a, b) => a - b);
+  const sRows = []; for (const s of ss) jobs.push(() => { const g = pairedGain(Object.assign(clone(P), { spreadMult: s }), packs); sRows.push({ label: `${s}×`, gain: g.gain, sub: `life ${g.life >= 0 ? "+" : ""}${g.life.toFixed(0)}%`, on: Math.abs(s - P.spreadMult) < 1e-6 }); if (sRows.length === ss.length) renderBars("spreadChart", sRows, "cell-to-cell spread, multiple of calibrated (1× = paper's cells)"); });
+  // 3. rest threshold
+  const rc = P.restCount > 0 ? P.restCount : 2, xs = ["off", 0, 10, 20, 30, 50, 70];
+  const rRows = []; for (const x of xs) jobs.push(() => {
+    const q = Object.assign(clone(P), x === "off" ? { restCount: 0 } : { restCount: rc, restRule: "life", restThresh: x });
+    const g = pairedGain(q, packs);
+    rRows.push({ label: x === "off" ? "off" : `${x}%`, gain: g.gain, sub: `life ${g.life >= 0 ? "+" : ""}${g.life.toFixed(0)}%`, on: x === "off" ? P.restCount === 0 : (P.restCount > 0 && P.restRule === "life" && P.restThresh === x) });
+    if (rRows.length === xs.length) renderBars("restChart", rRows, `rest when remaining life is this far below median (up to ${rc} cells, until pack ${P.restStop}%)`);
+  });
+  renderBars("sweepChart", null); renderBars("spreadChart", null); renderBars("restChart", null);
+  let i = 0;
+  const step = () => { if (token !== sweepToken || i >= jobs.length) return; jobs[i++](); setTimeout(step, 0); };
+  setTimeout(step, 0);
 }
 function recompute() {
   const t0 = performance.now();
   CUR = runAll(P, P.packs, true);
-  renderKPIs(CUR, DEF); renderTime();
+  renderTime();
+  renderEcon(CUR);
   $("status").textContent = `${P.packs} packs × 2 designs × ${YEARS} years in ${Math.round(performance.now() - t0)} ms`;
-  const token = ++sweepToken; renderSweep(null);
-  const ks = [...new Set([0, 2, 4, 8, 16, 32, P.N - 1].filter(k => k < P.N).concat([P.k]))].sort((a, b) => a - b).filter(k => k > 0);
-  const packs = Math.min(24, P.packs), rows = [];
-  const base = []; for (let pk = 0; pk < packs; pk++) base.push(simPack(P, "fixed", pk, false).mwh);
-  const baseMed = pct(base, 0.5);
-  let i = 0;
-  const step = () => {
-    if (token !== sweepToken) return;
-    if (i >= ks.length) { renderSweep(rows); return; }
-    const q = Object.assign(clone(P), { k: ks[i] }), m = [];
-    for (let pk = 0; pk < packs; pk++) m.push(simPack(q, "cell", pk, false).mwh);
-    rows.push({ k: ks[i], gain: 100 * (pct(m, 0.5) / baseMed - 1) }); i++;
-    setTimeout(step, 0);
-  };
-  setTimeout(step, 0);
+  runSweeps(++sweepToken);
 }
 function changed() { syncAvailability(); $("status").textContent = "Simulating…"; clearTimeout(timer); timer = setTimeout(recompute, 140); }
 
@@ -621,3 +927,4 @@ $("play").addEventListener("click", () => {
 buildControls();
 setTimeout(() => { DEF = runAll(clone(DEFAULTS), DEFAULTS.packs, true); recompute(); }, 0);
 </script>
+</body></html>
