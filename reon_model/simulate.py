@@ -101,6 +101,10 @@ class AgingConfig:
     knee_onset_fade: float = 0.07517     # mean-cell fade at knee onset (EV data transfer)
     r0_cv: float = 0.05918
     resistance_growth: float = 7.48153   # R/R0 = 1 + growth * fractional fade
+    # --- chemistry-agnostic spread and paper-aligned outliers ---
+    spread_multiplier: float = 1.0       # scales every within-pack spread (rate/knee/slope CVs, q0, r0); 1 = calibrated
+    outlier_fraction: float = 0.0        # share of cells that knee early (Zhou et al.: less favourable initial
+    outlier_knee_factor: float = 0.8     #   condition or harsher local history); their knee is multiplied by this
     # --- assumptions (not in the EV data) ---
     throughput_aging: bool = True        # cycle aging follows each cell's own charge throughput
     knee_onset_years: float | None = None  # None: solve B(tau_bar) = knee_onset_fade
@@ -144,11 +148,15 @@ def draw_cell_parameters(aging: AgingConfig, n: int, rng: np.random.Generator, t
     truncated below at ``MIN_FRACTION``. Temperature shifts m by the Arrhenius
     slope and moves tau and kappa only through their correlation with m.
     """
-    C3 = np.asarray(aging.cell_cov, dtype=float)
+    s_mult = aging.spread_multiplier
+    C3 = np.asarray(aging.cell_cov, dtype=float) * s_mult**2
     sT, a = aging.temp_sd_C, aging.arrhenius_slope
     mean3 = np.ones(3)
     if sT > 0:
-        c = a * sT**2 * C3[:, 0] / C3[0, 0]
+        # temperature carries its Arrhenius share of the rate spread; capped (as in the web app) so a
+        # narrow spread multiplier cannot make the conditional covariance negative
+        rho = min(0.95, a * sT / np.sqrt(C3[0, 0])) if C3[0, 0] > 0 else 0.0
+        c = rho * sT * C3[:, 0] / np.sqrt(C3[0, 0]) if C3[0, 0] > 0 else np.zeros(3)
         if temp is None:
             temp = sT * rng.standard_normal(n)
         cond_mean = mean3 + np.outer(temp, c) / sT**2
@@ -158,11 +166,13 @@ def draw_cell_parameters(aging: AgingConfig, n: int, rng: np.random.Generator, t
         z = rng.multivariate_normal(mean3, C3, n)
     z[:, 2] = 1.0 + aging.kappa_spread_scale * (z[:, 2] - 1.0)
     z = np.maximum(z, MIN_FRACTION)
+    if aging.outlier_fraction > 0:          # draw only when used, so the default RNG stream is unchanged
+        z[:, 1] = np.where(rng.random(n) < aging.outlier_fraction, z[:, 1] * aging.outlier_knee_factor, z[:, 1])
     return {
         "temp": np.asarray(temp, dtype=float),
         "m": z[:, 0], "tau_rel": z[:, 1], "kappa": aging.knee_slope_ratio * z[:, 2],
-        "q0": 1.0 + aging.q0_cv * rng.standard_normal(n),
-        "r0": 1.0 + aging.r0_cv * rng.standard_normal(n),
+        "q0": 1.0 + aging.q0_cv * s_mult * rng.standard_normal(n),
+        "r0": 1.0 + aging.r0_cv * s_mult * rng.standard_normal(n),
     }
 
 
