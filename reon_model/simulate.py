@@ -3,9 +3,9 @@
 Two effects, two kinds of math
 ------------------------------
 1. Gradual drift (deterministic given cell parameters): every cell fades as
-   sqrt(t) calendar aging + linear cycle aging, scaled by its own aging
-   multiplier (manufacturing spread x Arrhenius temperature factor), plus a
-   "knee" of accelerated fade after a cell-specific onset time.
+   sqrt(t) calendar aging + linear cycle aging, scaled by its own multiplier,
+   then linearly faster after a cell-specific knee. The spread structure is
+   calibrated on Zhou et al. (2026) per-cell data; see ``AgingConfig``.
 
 2. Sudden faults (stochastic): each cell's hard-fault process is an NHPP with
    intensity lambda_i(t) = lambda_0 * exp(beta . x_i(t)), where x_i(t) are
@@ -27,9 +27,9 @@ charge is
 h = 0 is the fixed string (n * min Q). h = n-1 is "every cell runs to its own
 end" (sum Q). See ``usable_capacity``.
 
-All parameter defaults are placeholders chosen to be plausible for a
-stationary sodium-ion C&I block (REON EBS: 30 kW / 60 kWh). Replace them with
-calibrated values (Zhou et al. 2026 fleet data, TUM Na-ion data, REON input).
+Aging-spread defaults are calibrated (``scripts/calibrate.py``). The stationary
+timeline (k_cal, k_cyc, knee transfer), the pack design and every fault-hazard
+parameter remain assumptions for a sodium-ion C&I block (REON EBS: 30 kW / 60 kWh).
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ import numpy as np
 
 FEATURES = ["temp_offset_C", "soh_gap", "resistance_gap"]
 R_GAS = 8.314
+MIN_FRACTION = 0.05   # truncation for per-cell multipliers (fraction of the mean)
 T_REF_K = 298.15
 
 
@@ -63,22 +64,102 @@ class PackConfig:
 
 @dataclass
 class AgingConfig:
-    q0_cv: float = 0.01              # BOL capacity spread (new cells)
-    multiplier_sigma: float = 0.15   # lognormal sd of per-cell aging rate
-    k_cal: float = 0.02              # calendar fade per sqrt(year)
-    k_cyc: float = 1.0e-5            # fade per equivalent full cycle
-    temp_sd_C: float = 2.0           # cell-to-cell temperature spread in the rack
-    activation_energy: float = 50e3  # J/mol (Arrhenius)
+    """Per-cell capacity fade, calibrated on Zhou et al. (2026) per-cell data.
+
+        Q_i(a) = q0_i - m_i * B(a) - kappa_i * b_bar * (a - tau_i)_+
+
+    * B(a) = k_cal*sqrt(a) + k_cyc*EFC(a): base fade of the mean cell (stationary
+      duty: an ASSUMPTION, not from the EV data).
+    * m_i: the cell's pre-knee fade multiplier (E[m] = 1).
+    * tau_i = tau_bar * P_pack * tau_rel_i: knee onset. tau_bar (years) is a
+      transfer ASSUMPTION; P_pack is the between-pack knee spread.
+    * After the knee the cell fades linearly at kappa_i times the mean pre-knee
+      rate b_bar = B(tau_bar)/tau_bar.
+    * (m, tau_rel, kappa) are jointly normal across cells (see
+      ``draw_cell_parameters``). Their covariance and the slope ratio come from
+      hinge fits to 95 cells (``reon_model.calibration``); a slot's temperature
+      offset carries the Arrhenius share of m.
+    """
+
+    # --- calibrated on Zhou et al. 2026 (data/calibration_zhou2026.json) ---
+    q0_cv: float = 0.00473
+    cell_cov: tuple = ((0.14341, -0.00787, 0.05951),
+                       (-0.00787, 0.00194, -0.00919),
+                       (0.05951, -0.00919, 0.12032))
+    knee_slope_ratio: float = 8.3774     # mean post-knee slope / mean pre-knee slope
+    knee_pack_logsd: float = 0.13853     # between-pack spread of knee onset
+    kappa_spread_scale: float = 0.537    # post-knee slope spread shrink (1 = as fitted)
+    knee_onset_fade: float = 0.07517     # mean-cell fade at knee onset (EV data transfer)
+    r0_cv: float = 0.05918
+    resistance_growth: float = 7.48153   # R/R0 = 1 + growth * fractional fade
+    # --- assumptions (not in the EV data) ---
+    knee_onset_years: float | None = None  # None: solve B(tau_bar) = knee_onset_fade
+    k_cal: float = 0.02                  # calendar fade per sqrt(year)   (assumption)
+    k_cyc: float = 1.0e-5                # fade per equivalent full cycle (assumption)
+    temp_sd_C: float = 2.0               # cell-to-cell temperature spread in the rack
+    activation_energy: float = 50e3      # J/mol (Arrhenius)
     t_mean_C: float = 25.0
-    knee_shape: float = 6.0          # Weibull shape for knee onset
-    knee_scale_years: float = 20.0   # Weibull scale, divided by the aging multiplier
-    knee_rate: float = 0.03          # extra fade per year^2 after the knee
-    r0_cv: float = 0.03              # BOL resistance spread
-    resistance_growth: float = 3.0   # R/R0 = 1 + growth * fractional fade
+
+    def base_fade(self, age, cycles_per_year):
+        age = np.asarray(age, dtype=float)
+        return self.k_cal * np.sqrt(age) + self.k_cyc * cycles_per_year * age
+
+    def knee_years(self, cycles_per_year) -> float:
+        if self.knee_onset_years is not None:
+            return float(self.knee_onset_years)
+        from scipy.optimize import brentq
+        return float(brentq(lambda a: self.base_fade(a, cycles_per_year) - self.knee_onset_fade, 1e-6, 1e3))
+
+    @property
+    def arrhenius_slope(self) -> float:
+        """d ln(rate) / dT at the mean temperature (per degC)."""
+        T = self.t_mean_C + 273.15
+        return self.activation_energy / (R_GAS * T * T)
+
+    @classmethod
+    def from_calibration(cls, path, **overrides) -> "AgingConfig":
+        import json
+        c = json.loads(open(path).read())["aging"]
+        c["cell_cov"] = tuple(tuple(r) for r in c["cell_cov"])
+        c.update(overrides)
+        return cls(**c)
+
+
+def draw_cell_parameters(aging: AgingConfig, n: int, rng: np.random.Generator, temp=None) -> dict:
+    """Draw n cells. If ``temp`` is given (slot temperatures), condition on it.
+
+    (m, tau_rel, kappa/knee_slope_ratio) are multivariate normal with mean 1
+    and covariance ``cell_cov`` (linear space: the fitted post-knee slopes are
+    symmetric, so log-normal marginals would overstate the weak-cell tail),
+    truncated below at ``MIN_FRACTION``. Temperature shifts m by the Arrhenius
+    slope and moves tau and kappa only through their correlation with m.
+    """
+    C3 = np.asarray(aging.cell_cov, dtype=float)
+    sT, a = aging.temp_sd_C, aging.arrhenius_slope
+    mean3 = np.ones(3)
+    if sT > 0:
+        c = a * sT**2 * C3[:, 0] / C3[0, 0]
+        if temp is None:
+            temp = sT * rng.standard_normal(n)
+        cond_mean = mean3 + np.outer(temp, c) / sT**2
+        z = cond_mean + rng.multivariate_normal(np.zeros(3), C3 - np.outer(c, c) / sT**2, n)
+    else:
+        temp = np.zeros(n)
+        z = rng.multivariate_normal(mean3, C3, n)
+    z[:, 2] = 1.0 + aging.kappa_spread_scale * (z[:, 2] - 1.0)
+    z = np.maximum(z, MIN_FRACTION)
+    return {
+        "temp": np.asarray(temp, dtype=float),
+        "m": z[:, 0], "tau_rel": z[:, 1], "kappa": aging.knee_slope_ratio * z[:, 2],
+        "q0": 1.0 + aging.q0_cv * rng.standard_normal(n),
+        "r0": 1.0 + aging.r0_cv * rng.standard_normal(n),
+    }
 
 
 @dataclass
 class HazardConfig:
+    """Fault-hazard NHPP parameters. PLACEHOLDERS: the paper data has no fault events."""
+
     base_rate: float = 0.0015        # hard faults per cell-year at x = 0
     coef: dict = field(default_factory=lambda: {
         "temp_offset_C": 0.12,       # per degC hotter than pack mean
@@ -113,42 +194,39 @@ def usable_capacity(Q, active, headroom):
 class _CellSlots:
     """State of P packs x N cell slots (a slot gets a new cell when replaced)."""
 
-    def __init__(self, P, N, aging: AgingConfig, rng: np.random.Generator):
-        self.aging, self.rng = aging, rng
+    def __init__(self, P, N, aging: AgingConfig, cycles_per_year: float, rng: np.random.Generator):
+        self.aging, self.rng, self.cpy = aging, rng, cycles_per_year
         self.P, self.N = P, N
+        self.tau_bar = aging.knee_years(cycles_per_year)
+        self.b_bar = float(aging.base_fade(self.tau_bar, cycles_per_year)) / self.tau_bar
+        s = aging.knee_pack_logsd
+        self.pack_knee = rng.lognormal(-s * s / 2, s, (P, 1)) if s > 0 else np.ones((P, 1))
         shape = (P, N)
-        self.q0 = np.empty(shape); self.r0 = np.empty(shape)
-        self.temp = np.empty(shape); self.mult = np.empty(shape)
-        self.knee = np.empty(shape); self.installed = np.zeros(shape)
-        self.budget = np.empty(shape); self.cum = np.zeros(shape)
-        self._fill(np.ones(shape, dtype=bool), t=0.0)
+        for name in ("q0", "r0", "temp", "m", "tau", "kappa", "installed", "budget", "cum"):
+            setattr(self, name, np.zeros(shape))
+        self._fill(np.ones(shape, dtype=bool), t=0.0, initial=True)
 
-    def _fill(self, mask, t):
-        a, rng, n = self.aging, self.rng, int(mask.sum())
+    def _fill(self, mask, t, initial=False):
+        n = int(mask.sum())
         if n == 0:
             return
-        self.q0[mask] = 1.0 + a.q0_cv * rng.standard_normal(n)
-        self.r0[mask] = 1.0 + a.r0_cv * rng.standard_normal(n)
-        # rack temperature is a property of the slot, not the cell: keep it on replacement
-        if t == 0.0:
-            self.temp[mask] = a.temp_sd_C * rng.standard_normal(n)
-        T = a.t_mean_C + self.temp[mask] + 273.15
-        arrhenius = np.exp(a.activation_energy / R_GAS * (1.0 / T_REF_K - 1.0 / T))
-        self.mult[mask] = rng.lognormal(0.0, a.multiplier_sigma, n) * arrhenius
-        self.knee[mask] = a.knee_scale_years * rng.weibull(a.knee_shape, n) / self.mult[mask]
+        # rack temperature belongs to the slot: a replacement cell inherits it
+        d = draw_cell_parameters(self.aging, n, self.rng, temp=None if initial else self.temp[mask])
+        for name in ("q0", "r0", "m", "kappa", "temp"):
+            getattr(self, name)[mask] = d[name]
+        self.tau[mask] = self.tau_bar * np.broadcast_to(self.pack_knee, mask.shape)[mask] * d["tau_rel"]
         self.installed[mask] = t
-        self.budget[mask] = rng.exponential(1.0, n)
+        self.budget[mask] = self.rng.exponential(1.0, n)
         self.cum[mask] = 0.0
 
     def replace(self, mask, t):
         self._fill(mask, t)
 
-    def capacity(self, t, cycles_per_year):
-        a = self.aging
+    def capacity(self, t):
         age = np.maximum(t - self.installed, 0.0)
-        fade = self.mult * (a.k_cal * np.sqrt(age) + a.k_cyc * cycles_per_year * age)
-        fade += self.mult * a.knee_rate * np.maximum(age - self.knee, 0.0) ** 2
-        return np.clip(self.q0 * (1.0 - fade), 0.0, None)
+        fade = self.m * self.aging.base_fade(age, self.cpy)
+        fade += self.kappa * self.b_bar * np.maximum(age - self.tau, 0.0)
+        return np.clip(self.q0 - fade, 0.0, None)
 
     def resistance(self, Q):
         frac_fade = np.clip(1.0 - Q / self.q0, 0.0, 1.0)
@@ -190,7 +268,7 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
     dt = 1.0 / pack.steps_per_year
     K = int(round(pack.years * pack.steps_per_year))
     t_grid = np.arange(K) * dt
-    slots = _CellSlots(P, N, aging, rng)
+    slots = _CellSlots(P, N, aging, pack.cycles_per_year, rng)
     beta = hazard.beta
 
     bypassed = np.zeros((P, N), dtype=bool)
@@ -202,7 +280,7 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
 
     for k, t in enumerate(t_grid):
         active = ~bypassed
-        Q = slots.capacity(t, pack.cycles_per_year)
+        Q = slots.capacity(t)
         R = slots.resistance(Q)
         X = cell_features(Q, R, slots.temp, active)
         lam = hazard.base_rate * np.exp(X @ beta) * active  # bypassed cells are not at risk
@@ -265,5 +343,5 @@ def compare(n_packs=200, pack=PackConfig(), aging=AgingConfig(), hazard=HazardCo
     return {m: simulate(m, n_packs, pack, aging, hazard, seed) for m in ("fixed", "bypass")}
 
 
-__all__ = ["FEATURES", "PackConfig", "AgingConfig", "HazardConfig", "SimResult",
+__all__ = ["FEATURES", "PackConfig", "AgingConfig", "draw_cell_parameters", "HazardConfig", "SimResult",
            "simulate", "compare", "usable_capacity", "cell_features"]

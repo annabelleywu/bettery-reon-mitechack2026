@@ -3,15 +3,17 @@
 MIT Energy & Climate Hack 2026, REON challenge. This repo estimates what per-cell bypass is worth compared with a conventional fixed series string. It combines
 
 1. a **learned fault model**: each cell's hard-fault process is a **non-homogeneous Poisson process (NHPP)** whose intensity is predicted from telemetry REON already measures, and
-2. a **Monte Carlo aging simulator**: gradual capacity drift with knee onset, plus those faults, for both architectures on identical cells.
+2. a **Monte Carlo aging simulator**: cell-to-cell capacity drift with knee onset, **calibrated on the per-cell field data of Zhou et al. (2026)**, plus those faults, for both architectures on identical cells.
 
 ```bash
 pip install -r requirements.txt
-python -m pytest -q             # 24 tests, including the Poisson-reduction checks
+./scripts/fetch_paper_data.sh   # optional: paper source data (MIT licence) into data/paper/
+python scripts/calibrate.py     # optional: refit data/calibration_zhou2026.json, validation report
+python -m pytest -q             # 30 tests (2 need the paper data)
 python scripts/run_demo.py      # writes outputs/summary.md and figures
 ```
 
-> **Every number is an estimate under placeholder assumptions.** Nothing here is a REON performance claim. Parameter defaults live in `reon_model/simulate.py` (`PackConfig`, `AgingConfig`, `HazardConfig`). They need to be calibrated on real data: the Zhou et al. 2026 fleet data, the TUM Na-ion aging data, and REON's own inputs (switch loss, voltage window).
+> **What is calibrated and what is not.** The cell-to-cell aging *spread* (rates, knee onset, post-knee slopes and their correlations) comes from real per-cell data and is checked against held-out fleet metrics. The stationary *timeline* (fade per year, knee onset in years), the NMC-to-sodium-ion transfer, the pack design and every fault-hazard number are assumptions. Nothing here is a REON performance claim.
 
 ## 1. Fault model: NHPP with a learned intensity
 
@@ -54,29 +56,62 @@ Every routine is written in terms of $\Lambda$ and $\Lambda^{-1}$ (sampling uses
 
 `PoissonIntensityGLM.lrt_vs_homogeneous()` runs a likelihood-ratio test of H0: "all λ equal". This lets the data decide whether the NHPP structure is needed at all.
 
-## 2. Capacity drift and usable energy
+## 2. Capacity drift (calibrated) and usable energy
 
 Each cell fades as
 
-$$Q_i(t) = q_{0,i}\Big[1 - m_i\big(k_\text{cal}\sqrt{t} + k_\text{cyc}\,\text{EFC}(t)\big) - m_i\,k_\text{knee}\,(t-\tau_i)_+^2\Big]$$
+$$Q_i(a) = q_{0,i} - m_i\,B(a) - \kappa_i\,\bar b\,(a-\tau_i)_+$$
 
 where:
 
-- $m_i$ is the cell's aging multiplier: a lognormal manufacturing spread times an Arrhenius factor for its slot temperature.
-- $\tau_i$ is the knee onset time, drawn from a Weibull distribution and scaled by $1/m_i$.
-- EFC is the number of equivalent full cycles.
+- $B(a) = k_\text{cal}\sqrt{a} + k_\text{cyc}\,\text{EFC}(a)$ is the mean cell's base fade (stationary assumption).
+- $m_i$ is the cell's pre-knee rate multiplier.
+- $\tau_i = \bar\tau\,P_\text{pack}\,\tau_{\text{rel},i}$ is its knee onset.
+- After the knee the cell fades **linearly** at $\kappa_i$ times the mean pre-knee rate $\bar b = B(\bar\tau)/\bar\tau$.
+- $(m, \tau_\text{rel}, \kappa)$ are jointly normal across cells. A slot's temperature offset carries the Arrhenius share of $m$.
 
-Series cells share one current. If the inverter's voltage window allows *h* more cells to drop out during a discharge, the string stops when the (h+1)-th weakest cell empties. The delivered charge is then
+Series cells share one current. If the inverter's voltage window allows *h* more cells to drop out during a discharge, the string stops when the (h+1)-th weakest cell empties. The delivered charge is
 
 $$\sum_i \min\big(Q_i,\ Q_{(h+1)}\big)$$
 
-This gives *N*·min *Q* for the fixed string (h = 0) and Σ*Q* when every cell runs to its own end (h = N−1). It reproduces the brief's 16-cell example (`test_brief_sixteen_cell_example`). Bypass energy is also multiplied by a switch-efficiency loss.
+This gives *N*·min *Q* for the fixed string (h = 0) and Σ*Q* when every cell runs to its own end (h = N−1). It reproduces the brief's 16-cell example. Bypass energy is also multiplied by a switch-efficiency loss.
 
-## 3. Demo results (placeholder parameters)
+### Calibration on Zhou et al. (2026)
 
-`scripts/run_demo.py` simulates one 96-cell, 59.5 kWh EBS-sized block, with bypass headroom k = 4, cycled once a day, retired below 70% of nameplate, over 500 Monte Carlo packs. The paired difference on identical cells is **+1.75 years of service** (P10 0.3, P90 4.0), **+32 MWh delivered** over the block's life, and **8 → 1** service outages. The full tables are in [`outputs/summary.md`](outputs/summary.md).
+Source: [the paper's GitHub repo](https://github.com/Rico-dicp/Ev-battery-cell-to-cell-inconsistency), `Source Data of Figures in Manuscript`. The cells are NMC, from passenger cars with 95 cells in series, and their capacities are estimated from field signals. The full report is in [`outputs/calibration_report.md`](outputs/calibration_report.md).
 
-![retention](outputs/retention_and_retirement.png)
+| from | what | result |
+|---|---|---|
+| Fig. 3g/3h, one car, 95 cell trajectories | a hinge fit per cell, $Q = a - e(x-x_0) - s(x-\tau)_+$ (median RMSE 0.0007) | pre-knee rate CV 0.38; knee at 240k km ± 4.4% within the pack; post-knee slope 8.4× the pre-knee rate (CV 0.35, roughly symmetric); cells that knee early fade faster after it (r = −0.6); BOL capacity CV 0.0047; resistance +7.5× fractional fade |
+| Fig. 4, 12 cars × 95 cells at 80k and 280k km | each car's knee onset from its mean fade | between-pack knee spread: log-sd 0.14 (median 234k km) |
+| Fig. 5c, βlife of 19 cars | one shrink factor on post-knee slope spread (0.54), because linear extrapolation over-spreads beyond ~300k km | model βlife 0.82 = data 0.82 |
+| Fig. 5a/b, σSOH and βSOH vs mileage for 19 cars | **held out** | matches to within ~10–20% through 300k km |
+
+![calibration](outputs/calibration_validation.png)
+
+Two changes the data forced, compared with the earlier placeholders:
+
+1. Post-knee fade is linear (the rate jumps about 10× and then holds), not quadratic.
+2. The marginals are close to normal. Lognormal marginals put too many very weak cells in the pack.
+
+**Limitation:** real cars differ from each other more than the model does, because every car is assumed to share one pre-knee rate.
+
+## 3. Results (calibrated aging, placeholder timeline and faults)
+
+The demo simulates one 96-cell, 59.5 kWh EBS-sized block cycled once a day and retired below 70% of nameplate.
+
+**Capacity alone, with faults turned off.** The gain from bypass depends almost entirely on the headroom *k* and hardly at all on when the knee happens:
+
+| bypass headroom k | 2 | 4 | 8 | 16 | 32 | 95 (every cell to its own end) |
+|---|---|---|---|---|---|---|
+| lifetime energy vs fixed string | +4% | +6% | +9% | +12–13% | +16–18% | +23–25% |
+| service life vs fixed string | +3–4% | +5% | +7–8% | +10% | +13–14% | +19–20% |
+
+The k = 95 bound agrees with the paper: weakest-to-average life ratio βlife ≈ 0.82, i.e. about +21% if every cell ran to its own end. Within a pack the cells knee almost together, so the few weakest cells are only slightly worse than the next ones. Bypassing 4 cells therefore recovers only about a quarter of that bound. **Most of the capacity value needs a wide voltage window (large k).**
+
+**Faults (placeholder hazard).** With k = 4, service outages over the block's life fall from a median of 5 to 0, and availability rises from 98.7% to 100.0%. This ride-through effect is where small-*k* bypass pays off, but it rests on fault rates that the paper data cannot calibrate.
+
+![headroom](outputs/value_vs_headroom.png)
 
 ## Layout
 
@@ -84,12 +119,16 @@ This gives *N*·min *Q* for the fixed string (h = 0) and Σ*Q* when every cell r
 reon_model/nhpp.py             Poisson / NHPP primitives (piecewise, Crow-AMSAA, log-linear, pack survival)
 reon_model/intensity_model.py  Poisson-GLM intensity learner, LRT vs homogeneous, GBM challenger
 reon_model/simulate.py         aging + fault Monte Carlo, fixed vs bypass, telemetry rows for training
+reon_model/calibration.py      hinge fits, knee spread, validation against Zhou et al. (2026)
+data/calibration_zhou2026.json fitted aging parameters (committed; raw paper data is not)
+scripts/fetch_paper_data.sh    download the paper source data
+scripts/calibrate.py           refit + validation report -> outputs/calibration_report.md
 scripts/run_demo.py            end-to-end demo -> outputs/
 tests/                         reduction-to-Poisson and model tests
 ```
 
 ## Next steps
 
-- Calibrate the aging spread and knee onset on the Zhou et al. per-cell data and the TUM Na-ion data. Swap the synthetic telemetry rows for real cell-period rows; `PoissonIntensityGLM.fit(X, events, exposure)` takes them directly.
-- Add the economics layer: Massachusetts C&I demand charges, ConnectedSolutions payments, and deferred augmentation or replacement. Then a sensitivity tornado.
-- Ask REON for the switch loss, the voltage window (realistic *k*), and observed cell fault rates.
+- Ask REON for the real voltage window (*k*), the switch loss and observed cell fault rates. *k* is now the parameter that matters most for capacity value.
+- Download the raw vehicle data (OneDrive link in the paper repo) to fit per-car pre-knee rates and the 17 LFP buses. Add a sodium-ion dataset (TUM) to test the chemistry transfer.
+- Add the economics layer: Massachusetts C&I demand charges, ConnectedSolutions payments, deferred augmentation, and the value of avoided outages. Then a sensitivity tornado.

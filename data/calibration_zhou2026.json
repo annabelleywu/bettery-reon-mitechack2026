@@ -1,0 +1,138 @@
+{
+  "source": "Zhou et al. 2026 Nature Energy, github.com/Rico-dicp/Ev-battery-cell-to-cell-inconsistency",
+  "aging": {
+    "cell_cov": [
+      [
+        0.14341,
+        -0.00787,
+        0.05951
+      ],
+      [
+        -0.00787,
+        0.00194,
+        -0.00919
+      ],
+      [
+        0.05951,
+        -0.00919,
+        0.12032
+      ]
+    ],
+    "knee_slope_ratio": 8.3774,
+    "q0_cv": 0.00473,
+    "knee_onset_fade": 0.07517,
+    "knee_pack_logsd": 0.13853,
+    "r0_cv": 0.05918,
+    "resistance_growth": 7.48153,
+    "kappa_spread_scale": 0.537
+  },
+  "ev_clock": {
+    "cell_cov": [
+      [
+        0.14341,
+        -0.00787,
+        0.05951
+      ],
+      [
+        -0.00787,
+        0.00194,
+        -0.00919
+      ],
+      [
+        0.05951,
+        -0.00919,
+        0.12032
+      ]
+    ],
+    "skew_e_tau_s": [
+      0.5064286058742141,
+      -0.7755818939196958,
+      -0.08549623747616635
+    ],
+    "knee_slope_ratio": 8.377404194267564,
+    "q0_cv": 0.004726510340245238,
+    "e_mean_per_1000km": 0.00010639053606221613,
+    "s_mean_per_1000km": 0.000891276523037984,
+    "tau_mean_km": 240.36911052631586,
+    "a_mean": 0.9425449853448356,
+    "x0_km": 73.8849,
+    "hinge_rmse_median": 0.0007369029060760024
+  },
+  "resistance": {
+    "r0_cv": 0.0591839583960376,
+    "resistance_growth": 7.481528982691607,
+    "corr_capacity_resistance_end": -0.35764463850226547
+  },
+  "pack_knee": {
+    "knee_pack_logsd": 0.13852820907475116,
+    "fleet_tau_km_median": 233.59626364607533,
+    "per_car_tau_km": [
+      246.6,
+      182.8,
+      200.3,
+      238.8,
+      242.4,
+      253.0,
+      196.6,
+      263.0,
+      250.2,
+      201.7,
+      270.0,
+      263.8
+    ],
+    "per_car_censored": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ],
+    "per_car_mean_fade": [
+      0.051,
+      0.108,
+      0.0923,
+      0.058,
+      0.0548,
+      0.0454,
+      0.0956,
+      0.0364,
+      0.0478,
+      0.091,
+      0.023,
+      0.0357
+    ]
+  },
+  "aging_as_fitted": {
+    "cell_cov": [
+      [
+        0.14341,
+        -0.00787,
+        0.05951
+      ],
+      [
+        -0.00787,
+        0.00194,
+        -0.00919
+      ],
+      [
+        0.05951,
+        -0.00919,
+        0.12032
+      ]
+    ],
+    "knee_slope_ratio": 8.3774,
+    "q0_cv": 0.00473,
+    "knee_onset_fade": 0.07517,
+    "knee_pack_logsd": 0.13853,
+    "r0_cv": 0.05918,
+    "resistance_growth": 7.48153,
+    "kappa_spread_scale": 1.0
+  }
+}

@@ -16,7 +16,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from reon_model import (  # noqa: E402
-    FEATURES, HazardConfig, PackConfig, PoissonIntensityGLM, bypass_survival, compare,
+    FEATURES, AgingConfig, HazardConfig, PackConfig, PoissonIntensityGLM, bypass_survival, compare,
     fit_gradient_boosted_intensity, fixed_string_survival, poisson_deviance, simulate,
 )
 
@@ -35,7 +35,9 @@ def train_test_split_by_pack(rows, frac=0.7, seed=0):
 
 def main():
     lines = ["# REON fault-intensity model and value demo\n",
-             "All inputs are placeholder assumptions (see `reon_model/simulate.py`).\n"]
+             "Cell-aging spread is calibrated on Zhou et al. (2026) per-cell data "
+             "(`outputs/calibration_report.md`). The stationary timeline, pack design and "
+             "every fault-hazard number are placeholder assumptions (`reon_model/simulate.py`).\n"]
     pack = PackConfig()
     truth = HazardConfig()
 
@@ -124,6 +126,47 @@ def main():
     fig.savefig(OUT / "retention_and_retirement.png", dpi=150)
     plt.close(fig)
 
+    # ------------------------------- 2b. what headroom and knee timing are worth
+    # Drift only (faults off) so the capacity effect is isolated.
+    no_faults = HazardConfig(base_rate=1e-12)
+    ks = [0, 2, 4, 8, 16, 32, pack.n_series - 1]
+    scenarios = {
+        f"knee at fade-matched {AgingConfig().knee_years(pack.cycles_per_year):.1f} y (default)": AgingConfig(),
+        "knee at 10 y": AgingConfig(knee_onset_years=10.0),
+        "knee at 14 y": AgingConfig(knee_onset_years=14.0),
+        "as-fitted post-knee spread": AgingConfig(kappa_spread_scale=1.0),
+    }
+    long = PackConfig(years=20.0)
+    sweep = {}
+    for name, ag in scenarios.items():
+        life, mwh = [], []
+        for k in ks:
+            r = simulate("fixed" if k == 0 else "bypass", n_packs=300,
+                         pack=PackConfig(years=20.0, bypass_headroom=k), aging=ag, hazard=no_faults, seed=0)
+            life.append(np.median(np.where(np.isfinite(r.retirement_year), r.retirement_year, long.years)))
+            mwh.append(np.median(r.delivered_mwh))
+        sweep[name] = (np.array(life), np.array(mwh))
+    lines += ["## 2b. Capacity value vs. bypass headroom (faults off, 300 packs, median)\n",
+              "k = cells the voltage window lets drop out; k = 95 is every cell running to its own end "
+              "(a conceptual upper bound that ignores the voltage window).\n",
+              "| scenario | fixed: life (y) / MWh | " + " | ".join(f"k={k}" for k in ks[1:]) + " |",
+              "|---|---|" + "---|" * (len(ks) - 1)]
+    for name, (life, mwh) in sweep.items():
+        cells = [f"+{100 * (life[i] / life[0] - 1):.0f}% life, +{100 * (mwh[i] / mwh[0] - 1):.0f}% MWh" for i in range(1, len(ks))]
+        lines.append(f"| {name} | {life[0]:.1f} / {mwh[0]:.0f} | " + " | ".join(cells) + " |")
+    lines.append("")
+    fig, ax = plt.subplots(figsize=(6.4, 4.2))
+    for (name, (life, mwh)), c in zip(sweep.items(), [BYPASS, "#2b6cb0", "#805ad5", FIXED]):
+        ax.plot(ks, 100 * (mwh / mwh[0] - 1), "o-", color=c, label=name)
+    ax.set_xscale("symlog", linthresh=2)
+    ax.set_xticks(ks, [str(k) for k in ks])
+    ax.set(xlabel="bypass headroom k (cells)", ylabel="lifetime energy vs fixed string (%)",
+           title="Calibrated value of cell-level bypass (capacity only)")
+    ax.legend(fontsize=7)
+    fig.tight_layout()
+    fig.savefig(OUT / "value_vs_headroom.png", dpi=150)
+    plt.close(fig)
+
     # ------------------------------------------- 3. forward risk from the model
     # Take one pack at year 8, score each cell with the learned intensity, and
     # project the chance the system stays up over the next 24 months.
@@ -152,7 +195,7 @@ def main():
               f"vs. pack median {np.median(lam_cells):.4f}.\n",
               f"P(no outage in next 12 months): fixed {np.interp(1, horizon, s_fixed):.3f}, "
               + ", ".join(f"bypass k={k} {np.interp(1, horizon, s):.3f}" for k, s in s_byp.items()) + "\n",
-              "Figures: `retention_and_retirement.png`, `outage_risk_year8.png`.\n"]
+              "Figures: `retention_and_retirement.png`, `value_vs_headroom.png`, `outage_risk_year8.png`.\n"]
 
     (OUT / "summary.md").write_text("\n".join(lines))
     print("\n".join(lines))
