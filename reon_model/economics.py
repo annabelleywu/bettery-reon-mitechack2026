@@ -44,6 +44,7 @@ class EconConfig:
     bms_overhead: float = 0.04           # REON BMS overhead, share of system cost (REON CTO, derived 4-6%)
     itc: float = 0.30                    # federal investment tax credit (storage, FEOC caveat)
     discount_rate: float = 0.08
+    visit_cost: float = 1500.0           # $ per service visit to replace a failed cell or module (placeholder; $500-3,000)
     start_year: int = 2027
     grid_co2_lb_per_mwh: float = 597.0   # ISO-NE 2024 average emission rate
     embodied_co2_kg_per_kwh: float = 80.0  # Fraunhofer 2025 LCA: sodium-ion 75-87 kg CO2e/kWh cell
@@ -60,7 +61,8 @@ def pack_value(res, pack, econ: EconConfig, cell_level: bool) -> dict:
     spy = pack.steps_per_year
     life_steps = np.where(np.isfinite(res.retirement_year), np.round(res.retirement_year * spy), K).astype(int)
     capex = econ.installed_cost * pack.nameplate_kwh * (1 + (econ.bms_overhead if cell_level else 0.0)) * (1 - econ.itc)
-    out = {k: np.zeros(P) for k in ("npv", "mwh_ac", "cs1", "dc1", "cps1", "loss1", "net1")}
+    out = {k: np.zeros(P) for k in ("npv", "mwh_ac", "cs1", "dc1", "cps1", "loss1", "net1", "visit_cost")}
+    vk = getattr(res, "visits_by_step", None)
     out["payback"] = np.full(P, np.inf)
     out["capex"] = np.full(P, capex)
     for p in range(P):
@@ -79,7 +81,9 @@ def pack_value(res, pack, econ: EconConfig, cell_level: bool) -> dict:
                    * max(pack.cycles_per_year - econ.cs_event_days, 0) * frac * A)
             mwh = E / 1000 * pack.cycles_per_year * frac * A
             loss = mwh * (1 / econ.round_trip_efficiency - 1) * econ.energy_price * 1000
-            net = cs + dc + cps - loss
+            visit = econ.visit_cost * (vk[p, sl].sum() if vk is not None else 0.0)
+            out["visit_cost"][p] += visit
+            net = cs + dc + cps - loss - visit
             out["mwh_ac"][p] += mwh
             npv += net / (1 + econ.discount_rate) ** (y + 1)
             prev, cum = cum, cum + net

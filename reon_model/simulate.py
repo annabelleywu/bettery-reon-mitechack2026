@@ -56,6 +56,10 @@ class PackConfig:
     bypass_headroom: int = 4         # k: cells the voltage window lets you drop
     switch_efficiency: float = 0.995 # conduction loss of per-cell switches
     repair_days: float = 14.0        # outage per service visit
+    on_string_fault: str = "repair"  # when the string cannot carry on after a hard cell fault (a fixed string at its
+                                     # first fault; cell-level control once more than k cells are out): "repair" =
+                                     # out for repair_days, then the failed cells are swapped; "retire" = the block
+                                     # is retired at that point (the worst case for the base system)
     cycles_per_year: float = 365.0
     retirement_retention: float = 0.70  # see retention_basis
     retention_basis: str = "nameplate"   # "nameplate", or "bol": this design's own beginning-of-life energy (brief's R_sys)
@@ -344,6 +348,8 @@ class SimResult:
     firm_kw: np.ndarray | None = None     # (P, K) min(rated kW, usable kWh / event hours) x availability; 0 after retirement
     beta_power: np.ndarray | None = None  # (P, K) power utilisation (see ``beta_power``)
     beta_soh: np.ndarray | None = None    # (P, K) min / mean capacity of discharging cells
+    visits_by_step: np.ndarray | None = None  # (P, K) service visits in each step (for discounted visit cost)
+    retired_by_fault: np.ndarray | None = None  # (P,) True if the block was retired by a hard fault
 
 
 def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
@@ -381,6 +387,9 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
     bpow = np.zeros((P, K)); bsoh = np.zeros((P, K))
     ocv_mid = float(monitoring.ocv_curve(0.5))
     faults = np.zeros(P); visits = np.zeros(P); isolated = np.zeros(P); rested_steps = np.zeros(P)
+    if pack.on_string_fault not in ("repair", "retire"):
+        raise ValueError(pack.on_string_fault)
+    visit_k = np.zeros((P, K)); dead_step = np.full(P, K)   # step from which a fault has ended the block's life
     rows = {"X": [], "events": [], "exposure": [], "pack": [], "t": []} if record_rows else None
     days_per_step = 365.0 * dt
 
@@ -449,16 +458,22 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
         # --- control response ------------------------------------------------
         if not policy.bypass_on_fault:
             # any fault stops the string; a technician swaps the cell
-            visits += n_fault
-            downtime_left += n_fault * pack.repair_days
+            stop_now = n_fault > 0
+            n_visit = n_fault.astype(float)
             swap = fault
         else:
             bypassed |= fault
-            over = bypassed.sum(axis=1) > k_max
-            visits += over
-            downtime_left += over * pack.repair_days
-            swap = bypassed & over[:, None]
+            stop_now = bypassed.sum(axis=1) > k_max
+            n_visit = stop_now.astype(float)
+            swap = bypassed & stop_now[:, None]
             bypassed &= ~swap
+        alive = dead_step == K
+        if pack.on_string_fault == "retire":
+            dead_step = np.where(alive & stop_now, k + 1, dead_step)   # energy at the start of step k still counts
+        else:
+            visits += n_visit * alive
+            visit_k[:, k] = n_visit * alive
+            downtime_left += n_visit * pack.repair_days
 
         served = np.minimum(downtime_left, days_per_step)
         avail[:, k] = 1.0 - served / days_per_step
@@ -478,6 +493,8 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
         raise ValueError(pack.retention_basis)
     below = retention < pack.retirement_retention
     first = np.where(below.any(axis=1), below.argmax(axis=1), K)
+    by_fault = dead_step < first
+    first = np.minimum(first, dead_step)
     retire = np.where(first < K, t_grid[np.minimum(first, K - 1)], np.inf)
     in_life = np.arange(K)[None, :] < first[:, None]
     delivered = (energy * avail * in_life).sum(axis=1) * pack.cycles_per_year * dt / 1000.0
@@ -487,7 +504,8 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
         rows["feature_names"] = names
     firm_kw = np.minimum(pack.rated_kw, energy / pack.event_hours) * avail * in_life
     return SimResult(mode, t_grid, energy, retention, avail, faults, visits, retire, delivered,
-                     isolated, rested_steps, rows, firm_kw, bpow, bsoh)
+                     isolated, rested_steps, rows, firm_kw, bpow, bsoh,
+                     visits_by_step=visit_k, retired_by_fault=by_fault)
 
 
 def compare(n_packs=200, pack=PackConfig(), aging=AgingConfig(), hazard=HazardConfig(), seed=0,
