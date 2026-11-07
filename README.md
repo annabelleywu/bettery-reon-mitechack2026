@@ -11,7 +11,10 @@ pip install -r requirements.txt
 python scripts/calibrate.py     # optional: refit data/calibration_zhou2026.json, validation report
 python -m pytest -q             # 41 tests (2 need the paper data)
 python scripts/run_demo.py      # writes outputs/summary.md and figures
+python scripts/run_value.py     # MA C&I value: energy, life, kW, $ and CO2 -> outputs/value_summary.md
 ```
+
+**What it is worth (v2).** `reon_model/economics.py` turns the simulated energy into value for a Massachusetts commercial site (2 × REON EBS, Eversource G-2): ConnectedSolutions, demand charges, Clean Peak, REON's BMS cost overhead (+4–6% of system cost, from REON's CTO), CO₂ avoided and cells kept out of waste. Team default: **+5.9% lifetime energy, +7.3% service life, +$3.2k NPV per site** (`outputs/value_summary.md`). Full method, sources and limitations: `docs/Methodology_v2.md`.
 
 **Interactive explorer:** open `webapp/index.html` in a browser (no server or build needed). It is a JavaScript port of the same model: sliders for every assumption, per-cell capacity rings for both designs over time, and the change in service life, lifetime energy and outages against both the fixed string and the default settings.
 
