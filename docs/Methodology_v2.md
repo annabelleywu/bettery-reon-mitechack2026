@@ -1,0 +1,394 @@
+# Methodology (v2): what cell-level control is worth for a Massachusetts C&I battery
+
+MIT Energy & Climate Hack 2026 · REON challenge · updated Nov 7, 2026, 1:30 pm
+
+This document describes the full model behind the Cell Bypass Explorer web app (https://claude.ai/artifact/2uKjEAMjq2JzoyPa3ejHJd). It extends Annabelle's Methodology v1 (cell-aging calibration, series-string physics, fault model) with the kW metrics, lifetime optimization, chemistry-agnostic spread, cost of control, Massachusetts economics and environmental value. Every input is labelled **data** (fitted to public data), **derived** (our algebra from stated physics), **sourced** (a published figure, linked in the Sources table), **REON** (stated by REON) or **assumed** (a placeholder we chose).
+
+Results in Section 13 come from the browser model at 200 simulated packs (Monte Carlo noise about ±1 percentage point). The Python model matches the browser at equal settings (Section 11); the new features in this document are being ported to Python.
+
+---
+
+## 0. Summary
+
+**Question.** For a Massachusetts commercial site with solar and a REON battery, how much more energy, service life, firm power and money does per-cell bypass deliver than a conventional fixed series string, after paying for REON's more expensive BMS?
+
+**System.** Two REON EBS blocks (each 30 kW / 60 kWh, sodium-ion; REON slides) = 60 kW / 120 kWh, at an Eversource Greater Boston G-2 site, from 2027.
+
+**Headline (default settings, median of 200 packs):**
+
+| Metric | Fixed string | Cell-level control | Difference |
+|---|---|---|---|
+| Lifetime energy delivered (AC, per site) | ~285 MWh | ~305 MWh | **+7.2%** (+19.5 MWh) |
+| Service life (to 70% of nameplate energy) | 7.5 y | 8.2 y | **+8.9%** |
+| Year-1 net value per site | $25.4k | about the same | −1% (switch loss) |
+| Simple payback | 2.0 y | 2.1 y | +0.1 y |
+| NPV over service life (per site) | $78.4k | $82.3k | **+$3.9k** (P10 +$1.0k, P90 +$8.0k) |
+| CO₂ avoided over 20 y | — | — | ~5 t (operation) + ~2 t (cells not manufactured) |
+| Cells kept out of waste over 20 y | — | — | ~190 kg (~27 kWh) |
+
+**Four findings:**
+1. **Value scales with cell-to-cell spread.** At the spread measured in the paper's cells, bypass recovers +6–7% lifetime energy, which clears REON's +4–6% cost overhead. At half that spread it does not (+3%); at 2× it gives +14%; at 3×, +22%. REON pays most where cells are uneven: looser binning, hot spots, mixed-age packs.
+2. **Bypass headroom k is the biggest technical lever.** +3.5% at k = 2, +6.4% at k = 4, +12% at k = 16, +23% if every cell runs to its own end (k = 95). Cells knee almost together (knee timing varies 4.4% within a pack), so the next-weakest cells are close behind the weakest.
+3. **Resting cells helps only before the knee, and adds life more than money.** Resting the two lowest remaining-life cells until pack health falls to 85% adds +0.8 points of energy and +3 points of life, but leaves NPV unchanged under default aging. It adds +4 points of energy when aging is cycle-dominated. Resting all life long loses energy.
+4. **Demand charges are two-thirds of the value**, so the utility territory matters most economically. On National Grid's G-2 rate the NPV gain falls from +$3.9k to +$1.8k per site.
+
+---
+
+## 1. Problem framing against the brief
+
+| Brief requirement | How we meet it |
+|---|---|
+| Specific real-world application | Massachusetts C&I solar + storage, 2 × REON EBS, Eversource G-2. REON's CTO asked for "depth over breadth" and "end customer first" (Discord). |
+| Clear baseline | A fixed series string with passive balancing. The weakest cell ends every discharge; the pack retires when its energy falls below the threshold. The paper shows passive balancing holds SOC imbalance under 2% of capacity, so balancing is assumed to remove SOC imbalance but not capacity differences. |
+| Control case | The same cells, with REON's two given capabilities: per-cell monitoring (measured with noise) and selective bypass within a voltage-window limit k. |
+| Capacity recovery | Bypass on empty: usable charge Σ min(Qᵢ, Q₍ₖ₊₁₎) (Section 4). |
+| Lifetime optimization | Resting cells by predicted remaining life before the knee; optional temperature-triggered resting (Section 5). |
+| kWh and kW at a defined boundary | All economic outputs at the AC meter (inverter efficiency applied); firm kW for committed events; βpower (Section 6). |
+| Economic outcome for one stakeholder | NPV, payback and capex per delivered MWh for the asset owner (Section 8). |
+| Environmental outcome | CO₂ avoided and cells kept out of waste; REON said both are wanted (Section 9). |
+| Sensitivity | Sliders for every input; sweeps over k, spread and resting; scenario table (Section 14). |
+| EV paper not presented as REON claims | The paper sets only the cell-to-cell spread structure; the stationary timeline is an explicit assumption. |
+
+---
+
+## 2. Data and calibration
+
+All calibrated numbers come from the public source data of Zhou et al., *Nature Energy* (2026), repository Rico-dicp/Ev-battery-cell-to-cell-inconsistency (MIT licence) [S1, S2]. The cells are NMC prismatic cells in passenger cars, 95 in series; capacities are estimated from field charging data, not lab-measured.
+
+**Verified from the paper text** [S1]:
+- 116 cars and 17 buses over 3+ years, up to 300,000 km. Cell inconsistency costs cars 6.2% of pack health, 17.7% of pack life and 12.9% of power, with βenergy 0.807. Buses (LFP) lose 7.5%, 22.8% and 15.1%, with βenergy 0.73.
+- "Normalised capacity" is relative to the **nominal capacity of new cells** (capacity-defined SOH). Reference condition: 27 °C, 50% SOC.
+- βlife uses an end of life of **0.85** SOH, because the vehicles had not reached 0.80.
+- SOC imbalance reduces usable charge by under 2%. Cars with passive balancing kept cell-voltage spread under 100 mV; buses without balancing reached 300 mV.
+
+**Files used** (Annabelle's calibration, Methodology v1):
+
+| File | Content | Use |
+|---|---|---|
+| Fig. 3g | Capacity of 95 cells in one car, 74k–303k km | Per-cell hinge fits: pre-knee rate, knee, post-knee slope |
+| Fig. 3h | Resistance of the same cells | Resistance spread (CV 0.059) and growth with fade (7.48 per unit) |
+| Fig. 4 (a–l) | 95 cells × 12 cars at 80k and 280k km | Knee spread between packs; validation |
+| Fig. 5a/5b | σSOH and βSOH vs mileage, 19 cars | Held-out validation |
+| Fig. 5c | βlife per car | One fitted target |
+| `07_indicator_calculation.py` | Paper's metric code | Exact βlife definition |
+
+**Hinge fit per cell** (form chosen to match the data):
+
+```latex
+Q_i(x) = a_i - e_i\,(x - x_0) - s_i\,(x - \tau_i)_+ , \qquad (u)_+ = \max(u, 0)
+```
+
+**Fitted structure** (data): mean pre-knee rate 0.0106 per 100k km; mean knee 240k km; post-knee slope 8.38× pre-knee; cell-to-cell CVs of rate, knee and post-knee slope 0.38, 0.044, 0.35; correlations −0.47 (rate–knee), +0.45 (rate–slope), −0.60 (knee–slope); beginning-of-life capacity CV 0.47%; knee timing between packs log-sd 0.139; post-knee spread shrink λ = 0.537, fitted so that mean βlife matches the 19 cars (0.823).
+
+**Independent check** (Isabell, Fig. 4 at 280k km): the weakest cell sits on average 2.92 SDs below its pack mean, and mean βSOH is 0.920. The calibrated model gives 2.77 SDs and 0.934.
+
+---
+
+## 3. Cell aging in stationary service
+
+The EV data fixes how cells differ from each other, not how fast a stationary block ages. Each cell's capacity at age a (years):
+
+```latex
+Q_i(a) = q_{0,i} - m_i\big[k_\text{cal}\sqrt{a} + k_\text{cyc}\,\text{EFC}_i(a)\big] - \kappa_i\,\bar b\,\big(c_i(a) - \tau_i\big)_+
+```
+
+- **Base fade** (assumed): calendar fade grows with √time and cycle fade with equivalent full cycles; k_cal = 0.02 per √year, k_cyc = 1 × 10⁻⁵ per cycle, 365 cycles a year. At the knee, 68% of fade is calendar.
+- **Cell multipliers** m, τ_rel, κ (data): drawn jointly normal with the fitted covariance; temperature carries its Arrhenius share of m's spread (Eₐ = 50 kJ/mol, 0.068 per °C at 25 °C, cell temperature spread 2 °C, assumed).
+- **Knee** (assumed transfer rule): placed where the mean cell has lost 7.5% of nominal capacity, as in the EV data. With the base fade above this is 6.6 years.
+- **Use clock** (derived): each cell's knee clock advances with its own use, `c_i += Δt (w_cal + w_cyc u_i)`, so a rested or bypassed cell ages on calendar time only.
+- **Resistance** (data): R/R₀ = 1 + 7.48 × fractional fade.
+
+**Chemistry-agnostic spread** (new). One multiplier s scales every within-pack spread: the CVs of rate, knee and post-knee slope, starting-capacity spread and resistance spread (equivalently, the rate/knee/slope covariance by s²). s = 1 reproduces the calibrated cells. REON's CTO says the BMS/EMS is chemistry-agnostic and REON wants to test mixed use; s stands in for chemistry, binning quality, hot spots or mixed-age packs.
+
+**Early-knee outliers** (new, paper-aligned, default off). The paper attributes accelerated aging to cells with "less favourable initial conditions or harsher local operating histories". A share f of cells (default 0) gets its knee multiplied by 0.8. The data's weakest cell (2.92–3.05 SDs below mean) sits slightly further out than the model's (2.77), so a small share is consistent with the data.
+
+**Why the percentages are trusted but not the years.** Moving the knee from 6.6 to 10 or 14 years changes fixed-string life from 7.4 to 10.5 to 14.2 years, but the gain at k = 4 stays at about +6% energy (Methodology v1). The gain comes from the spread structure, which is data; the years come from the timeline, which is assumed.
+
+---
+
+## 4. Series-string physics and bypass (capacity recovery)
+
+Series cells share one current. Sort the active cells' capacities Q₍₁₎ ≤ Q₍₂₎ ≤ …. If h more cells may drop out during a discharge, the string stops when the (h+1)-th weakest empties, and each cell passes the smaller of its own charge and that level (derived):
+
+```latex
+Q_\text{string}(h) = \sum_{i \in \text{active}} \min\!\big(Q_i,\; Q_{(h+1)}\big)
+```
+
+- h = 0 is the fixed string (n × min Q); h = n − 1 is every cell running to its own end (Σ Q).
+- Check against the brief: 15 cells at 85 Ah and one at 70 Ah give 16 × 70 = 1,120 Ah fixed and 15 × 85 + 70 = 1,345 Ah with h = 1 (+20%). Tested in code.
+- **Bypass headroom k** (assumed 4, ask REON): the inverter's voltage window allows at most k cells out of the string. h = k − (cells isolated) − (cells resting this month).
+- **Switch loss** (assumed 99.5% efficiency, ask REON) applies to the cell-level design only.
+- Energy per discharge = usable charge × cell Ah × 3.1 V (constant voltage; voltage sag ignored).
+
+---
+
+## 5. Monitoring and control
+
+**Measurement** (brief's given capability). The controller sees each cell's voltage, temperature, SOC, SOH, capacity, resistance, OCV and history, each with Gaussian noise (placeholders: 2 mV, 0.5 °C, 1%, 1%, 1%, 2%, 2 mV, 6-month smoothing). Signals are fused into one capacity estimate per cell by inverse-variance weighting (derived). Decisions use measured values only; aging uses true values.
+
+**Policy, each month, in order:**
+1. **Isolate** (optional, off by default): take a cell out for good if it is a set distance below the pack mean, hotter, or higher-resistance.
+2. **Rest by remaining life** (default on): before the knee, rest the cells that would reach retirement first.
+3. **Rest hot cells** (optional, off by default; REON: "our BMS can let a 'hot' cell be bypassed and take a rest").
+4. **Discharge** with the remaining headroom (Section 4).
+5. **Age** every cell by what it actually did.
+
+One headroom slot is kept free (`spare = 1`), and resting and isolation never use it.
+
+**Remaining-life estimate** (new, measured values only). For each cell keep the last 13 monthly capacity estimates.
+
+```latex
+r_i^\text{own} = -\text{OLS slope of } \hat Q_i \text{ over the last 12 months (needs} \ge 6\text{)} \qquad
+r_i^\text{prior} = \bar r_\text{pack}\,\frac{1-\hat Q_i}{\overline{1-\hat Q}} \qquad
+r_i = \tfrac12 r_i^\text{own} + \tfrac12 r_i^\text{prior}
+```
+
+```latex
+L_i = \frac{\hat Q_i - Q_\text{retire}}{r_i} \;\text{years}, \qquad \text{rest } i \text{ if } L_i < (1 - x)\,\text{median}(L)
+```
+
+Rest the lowest-L candidates, at most `min(rest_count, k − out − spare)`, and only while the measured pack mean is above `rest_stop` (default 85%). The fade-proportional prior steadies the noisy 12-month slope; it works because fast pre-knee faders knee earlier (fitted correlation −0.47).
+
+**What the resting results show** (Section 13):
+- Resting **before the knee** helps; resting all life long loses energy, because late in life the headroom is worth more for bypass on empty.
+- The binding settings are the **count** and the **stop level**. The threshold x does not bind below about 30%, because more than two cells always qualify. The web app's resting chart therefore shows flat bars from 0 to 30%; a sweep over the stop level is more informative.
+- **Temperature-triggered resting hurts in this model** (+3.4% energy instead of +7.2%). Rack temperatures are static here, so a hot cell stays hot and is rested every month, using headroom for good. Real hot spots move with load and season; modelling them needs time-varying temperatures (not yet built).
+
+---
+
+## 6. Output metrics
+
+| Metric | Definition | Notes |
+|---|---|---|
+| Retention | Energy per discharge ÷ nameplate (default), or ÷ the same design's beginning-of-life energy (the brief's R_sys) | Toggle; changes the gain by under 0.1 point |
+| Service life | First month retention < 70% | 70% from the brief (stationary); 80% as sensitivity |
+| Lifetime energy | Σ energy × availability × cycles over service life | Reported DC (simulator) and AC (economics) |
+| Firm kW (d hours) | min(inverter rating, usable kWh ÷ d) × availability; 0 after retirement | What ConnectedSolutions pays for |
+| βpower | Pack peak power ÷ Σ cell peak powers, cells at 50% SOC, 2.5 V floor | Paper eq. 12–16, simplified; the absolute resistance scale cancels; bypass may drop up to h of the highest-resistance cells |
+| βSOH | min ÷ mean cell capacity among active cells | Paper metric, shown under each ring |
+| βlife | First cell to 0.85 ÷ mean cell life | Used in calibration |
+
+βpower at beginning of life comes out at 0.893, close to the paper's fleet average of 0.871 (cars) and 0.849 (buses), which is a useful cross-check.
+
+---
+
+## 7. Cost of cell-level control and break-even
+
+REON's CTO on the hack Discord: REON's BMS costs "roughly three times the conventional BMS (depends on several factors: cell size, mcu, mos cost, etc.)", and a "BMS consist[s] only 2-3 % of system cost" [REON]. "MOS" refers to the MOSFET switches, so the switches are included.
+
+```latex
+\text{overhead} = (3 - 1) \times (2\text{–}3\%) = 4\text{–}6\% \text{ of system cost} \quad \text{(derived)}
+```
+
+This assumes REON's BMS replaces the conventional one. Default 4%; show 4–6%.
+
+**Break-even.** Cell-level control lowers installed cost per delivered MWh when the lifetime-energy gain exceeds the overhead, to first order. Every gain chart in the app draws this as a red line. It ignores firm-kW, outage and life value, so it is conservative.
+
+---
+
+## 8. Massachusetts C&I economics
+
+**Site.** 2 × REON EBS (60 kW / 120 kWh), Eversource Greater Boston rate G-2, first year 2027, solar on site. Two blocks clear the ≥50 kW size an aggregator lists for C&I ConnectedSolutions; the official program materials state no minimum [S3, S4].
+
+For each simulated pack and each year y of its service life, let E be the mean usable energy per discharge at the AC meter (× inverter efficiency 0.96, assumed) and A the availability. Per block:
+
+```latex
+\text{CS}_y = \$200/\text{kW} \times \min\!\big(30\,\text{kW},\; E/3\,\text{h}\big) \times A
+```
+ConnectedSolutions Daily Dispatch pays $200 per kW-summer on average kW held over 30–60 weekday events of 2–3 h, 2–7 pm, June–September, with a 5-year rate lock [S3]. We use 3-hour events (conservative).
+
+```latex
+\text{DC}_y = 12 \times \$33.95/\text{kW-month} \times 0.75 \times \min\!\big(30\,\text{kW},\; E/2\,\text{h}\big) \times A
+```
+Eversource Greater Boston G-2: $20.21 distribution + $13.74 transmission per kW-month (July 2026, via installer calculator [S5]; 2024 official summary $31.34 [S6]), billed on the monthly 15-minute peak [S7]. The 2-hour peak duration and 75% realization are assumed; replace them with a ComStock load profile [S8].
+
+```latex
+\text{CPS}_y = 0.87 \times \text{ACP}_y \times 1.0 \times \frac{E}{1000} \times (365 - 45) \times A, \qquad \text{ACP} = \$65 \;(\le 2032),\; \$45 \;(> 2032)
+```
+Clean Peak: ACP $65/MWh for 2026–2032 and $45 after [S9]; certificates have cleared at about 87% of ACP and merchant storage earns 1.0–2.0× multipliers [S10]. We use 1.0× and exclude ConnectedSolutions event days, because stacking in the same hour is not confirmed.
+
+```latex
+\text{Loss}_y = \text{MWh discharged} \times \left(\frac{1}{0.88} - 1\right) \times \$0.20/\text{kWh}
+```
+Round-trip efficiency 88% is assumed; energy price from National Grid commercial Basic Service, about 21.7 ¢/kWh (Jan 2026) [S11].
+
+```latex
+\text{Capex} = \$600/\text{kWh} \times 60\,\text{kWh} \times (1 + \text{overhead}_\text{cell}) \times (1 - 0.30)
+```
+Installed cost $600/kWh is assumed (installer data for small Massachusetts C&I: $500–800/kWh installed [S12]; at $350/kWh payback would be an implausible ~1.2 years). 30% investment tax credit: storage keeps it for projects beginning construction by 2033, subject to FEOC sourcing rules [S13, S14]; REON's cell origin is unknown.
+
+**NPV** = −Capex + Σ_y (CS + DC + CPS − Loss) / 1.08^(y+1) over each design's own service life. Operations and maintenance are omitted because they are the same for both designs. Results are medians over packs; the NPV difference is paired (same initial cells in both designs).
+
+**Year-1 value per site** (fixed string): ConnectedSolutions $7.4k, demand charges $17.0k, Clean Peak $2.0k, losses −$1.1k; net $25.4k. Cell-level control is about 1% lower in year 1 (switch loss) and gains later through slower capacity loss and longer life.
+
+---
+
+## 9. Environmental value
+
+- **Operational CO₂**: extra AC MWh delivered over life × 597 lb CO₂/MWh, the ISO-NE 2024 average emission rate [S15]. This assumes the battery charges from on-site solar and that delivered energy displaces average grid generation. Peak-hour marginal units emit more, so this is conservative.
+- **Cells not manufactured**: over a 20-year storage need, an owner buys 20 / life blocks of capacity. Avoided kWh = kWh × 20 × (1/life_fixed − 1/life_cell). Embodied CO₂ = avoided kWh × 80 kg CO₂e/kWh (Fraunhofer 2025 comparative LCA: sodium-ion 75–87, LFP 58–92 kg CO₂e per kWh of cell [S16]); replace with REON's lithium LCA when shared. Material = avoided kWh × 7 kg/kWh (assumed cell mass; ask REON).
+
+---
+
+## 10. Sudden faults (optional, off by default)
+
+The paper and REON describe gradual drift into a knee, not sudden failures, and the paper's data contains no fault events. Sudden faults are therefore **off by default**. Annabelle's NHPP fault model remains available (Methodology v1, Step 4): each cell's hazard λᵢ(t) = λ₀ exp(βᵀxᵢ(t)) on measured features, reducing exactly to a simple Poisson process when all rates are equal. All its rates are placeholders. The paper's own failure mode, early-knee outlier cells, is modelled instead (Section 3).
+
+---
+
+## 11. Monte Carlo procedure and implementation
+
+- **Packs**: 96 cells in series per 60 kWh block; monthly steps over 20 years; one representative discharge per month at 365 cycles a year.
+- **Common random numbers**: pack p gets identical initial cells in both designs, so differences come from the design, not luck.
+- **Reported values**: medians over packs with P10 and P90; paired differences for NPV.
+- **Two implementations**: Python (`reon_model/`, 41 tests, Annabelle) and the browser port (web app). At equal settings and 300 packs they agree: +6.0% vs +6% lifetime energy at k = 4 with faults off, and +2.8% vs +2.9% with faults on. The earlier +7.4% vs +5.6% gap came from the browser running only 48 packs. Slide numbers should come from runs with 200+ packs.
+
+---
+
+## 12. Validation
+
+| Check | Data | Model |
+|---|---|---|
+| Fig. 4 at 280k km: median σSOH | 0.0227 | 0.0210 |
+| Fig. 4 at 280k km: median βSOH | 0.918 | 0.934 |
+| Weakest cell, SDs below mean | 3.05 (2.92 Isabell) | 2.77 |
+| Fig. 5a σSOH, 250–300k km | 0.0239 | 0.0195 |
+| Fig. 5b βSOH, 250–300k km | 0.921 | 0.937 |
+| βpower at beginning of life | 0.871 (paper fleet mean, all ages) | 0.893 |
+| Brief's 16-cell example | 1,120 / 1,345 Ah | exact |
+| k = 0 bypass hardware equals fixed string | — | life identical; energy −0.8% (switch loss only) |
+
+The model matches the held-out fleet data within about 10–20% up to 300k km and slightly understates the weakest cell.
+
+---
+
+## 13. Results (200 packs, median; per site = 2 blocks; NPV gain paired)
+
+**Policy and headroom** (default aging and spread):
+
+| Case | Energy gain | Life gain | NPV gain per site (P10, P90) |
+|---|---|---|---|
+| Default: bypass on empty + rest before knee, k = 4 | +7.2% | +8.9% | +$3.9k (+$1.0k, +$8.0k) |
+| Bypass on empty only, k = 4 | +6.4% | +5.6% | +$4.0k (+$1.3k, +$7.9k) |
+| Resting only, no bypass on empty | +5.0% | +6.7% | +$1.8k (−$0.8k, +$5.7k) |
+| k = 0 (hardware, no use) | −0.8% | 0% | −$2.7k |
+| k = 2 | +3.5% | +3.3% | +$1.7k |
+| k = 8 | +9.1% | +7.8% | +$6.8k |
+| k = 16 | +12.4% | +11.1% | +$9.7k |
+| k = 32 | +16.5% | +14.4% | +$13.2k |
+| k = 95 (every cell to its own end) | +23.2% | +20.6% | +$19.6k |
+
+**Cell spread** (default policy):
+
+| Spread multiplier | Energy gain | Life gain | NPV gain per site |
+|---|---|---|---|
+| 0.5× | +3.2% | +4.5% | +$0.3k (P10 −$1.5k) |
+| 1× (paper's cells) | +7.2% | +8.9% | +$3.9k |
+| 1.5× | +9.6% | +9.6% | +$5.8k |
+| 2× | +14.1% | +13.2% | +$8.4k |
+| 3× | +21.7% | +22.8% | +$13.1k |
+| 5% early-knee outliers | +10.4% | +11.8% | +$5.6k |
+
+**Resting:**
+
+| Case | Energy gain | Life gain | NPV gain per site |
+|---|---|---|---|
+| Rest before knee (stop 85%), threshold 0–30% | +7.2% | +8.9% | +$3.9k |
+| Threshold 50% | +7.0% | +7.8% | +$4.4k |
+| Rest all life long (no stop) | +5.7% | +6.7% | +$2.9k |
+| Cycle-dominated aging, no resting | +5.4% | +4.7% | +$2.4k |
+| Cycle-dominated aging, rest before knee | +9.4% | +10.9% | +$5.1k |
+| Temperature resting at 1 °C or 3 °C | +3.3–3.4% | +5.6% | about −$0.2k |
+
+---
+
+## 14. Sensitivity of the NPV gain (per site)
+
+| Change from default | NPV gain | Note |
+|---|---|---|
+| Default | +$3.9k | |
+| BMS overhead 6% (instead of 4%) | +$2.9k | P10 roughly break-even |
+| National Grid G-2 ($15.06/kW-month) | +$1.8k | Fixed-string payback 3.3 y |
+| Retire at 80% instead of 70% | +$1.4k | Less post-knee time to recover |
+| Retention vs own beginning of life (R_sys) | +$3.9k | Under 0.1 point change |
+| Sudden faults on (placeholder rates) | +$2.5k | Faults use up headroom |
+| Spread 2× | +$8.4k | |
+| k = 8 | +$6.8k | |
+
+Order of influence on the gain: bypass headroom k and cell spread (largest), then utility rate, overhead and retirement threshold.
+
+---
+
+## 15. Limitations
+
+1. **One car sets the within-pack structure.** The 4.4% knee-timing spread, which limits small-k bypass, comes from 95 cells of one car. Packs that knee less in unison make bypass worth more.
+2. **NMC car cells stand in for REON's sodium-ion stationary cells.** The spread multiplier and REON's field data are the way to close this.
+3. **Extrapolation.** The data ends near 0.86 capacity; blocks retire at 0.70, so post-knee lines are extended with one correction (λ).
+4. **The stationary timeline is assumed** (calendar and cycle fade, knee at 6.6 years). Quote percentages, not years.
+5. **Simplified electrics.** Constant voltage, a count-based voltage window k, no thermal or UL limits.
+6. **Static temperatures**, which make temperature resting effectively permanent.
+7. **Economics are first-order**: no hourly dispatch optimization, demand-charge realization and peak duration are assumed, and ConnectedSolutions and Clean Peak are not stacked in the same hour. A ComStock load profile and PVWatts solar would replace the assumptions.
+8. **Rates change**: ConnectedSolutions has no published program year in the materials found; Clean Peak rules changed in May 2026.
+9. **Browser Monte Carlo noise** of about ±1 point at 200 packs; Python at 300+ packs is the reference.
+
+---
+
+## 16. Provenance of every input
+
+| Input | Value | Type | Source / note |
+|---|---|---|---|
+| Cell spread structure (CVs, correlations, slope ratio, knee level) | Section 2 | Data | Zhou et al. 2026 Fig. 3g/3h/4/5 [S2] |
+| Post-knee spread shrink | 0.537 | Data | Fitted to Fig. 5c βlife |
+| Series-string usable charge | Σ min(Qᵢ, Q₍ₖ₊₁₎) | Derived | Checked against the brief's 16-cell example |
+| Use-clock aging, remaining-life rule, βpower simplification | Sections 3, 5, 6 | Derived | Our algebra |
+| Calendar / cycle fade, knee transfer | 0.02/√y, 1e-5/cycle, 7.5% | Assumed | Sensitivity in v1 |
+| Cells per block, cell Ah, nominal V | 96, ~202 Ah, 3.1 V | Assumed | Sized to EBS 60 kWh |
+| Block rating | 30 kW / 60 kWh | REON | Hack slides; one-pager |
+| Bypass headroom k, spare | 4, 1 | Assumed | Ask REON |
+| Switch efficiency | 99.5% | Assumed | Ask REON |
+| BMS overhead | 4% (4–6%) | REON + derived | Tim Ren, Discord, Nov 7 |
+| Sensor noise | 2 mV, 0.5 °C, 1–2% | Assumed | Ask REON |
+| Rest policy | 2 cells, 20%, stop 85% | Assumed | Team default |
+| Retirement | 70% of nameplate | Brief | 80% as sensitivity |
+| ConnectedSolutions | $200/kW-summer, 3 h, 45 event days | Sourced | [S3] |
+| Demand charge | $33.95/kW-month | Sourced | [S5][S6] |
+| Peak duration, realization | 2 h, 75% | Assumed | Replace with ComStock |
+| Clean Peak | 87% × ACP ($65 / $45), 1.0× | Sourced | [S9][S10] |
+| Energy price | $0.20/kWh | Sourced | [S11] |
+| Round-trip / inverter efficiency | 88% / 96% | Assumed | Ask REON |
+| Installed cost | $600/kWh | Assumed | Installer range $500–800 [S12] |
+| ITC | 30% | Sourced | [S13][S14], FEOC caveat |
+| Discount rate | 8% | Assumed | |
+| Grid CO₂ | 597 lb/MWh | Sourced | ISO-NE 2024 average [S15] |
+| Embodied CO₂ | 80 kg/kWh | Sourced | Fraunhofer 2025, sodium-ion 75–87 [S16] |
+| Cell mass | 7 kg/kWh | Assumed | Ask REON |
+| Fault rates | off | — | Paper has no fault data |
+
+---
+
+## Sources
+
+| # | Source | Link |
+|---|---|---|
+| S1 | Zhou et al., "Quantifying the impact of cell-to-cell inconsistency on electric vehicle battery degradation and utilization", *Nature Energy* (2026) | https://doi.org/10.1038/s41560-026-02131-5 |
+| S2 | Paper source data and code | https://github.com/Rico-dicp/Ev-battery-cell-to-cell-inconsistency |
+| S3 | National Grid / Mass Save, ConnectedSolutions C&I program materials | https://www.nationalgridus.com/media/pdfs/bus-ways-to-save/connectedsolutions-programmaterials.pdf |
+| S4 | EnergyBot, Mass Save C&I ConnectedSolutions (≥50 kW, aggregator) | https://www.energybot.com/incentives/massachusetts/masssave-electric-ci-connected-solutions-program-22744.html |
+| S5 | NuWatt commercial storage calculator (cites Eversource Jul 2026 summary; installer) | https://nuwattenergy.com/en/commercial-solar/storage/calculator |
+| S6 | Eversource, 2024 Summary of Eastern MA Electric Rates, Greater Boston | https://www.eversource.com/Content/docs/default-source/rates-tariffs/ema-greater-boston-rates.pdf?sfvrsn=10 |
+| S7 | Nectar, National Grid MA rate guide (G-2 15-minute peak) | https://nectarclimate.com/rates/massachusetts-electric-national-grid |
+| S8 | NREL ComStock datasets | https://comstock.nrel.gov/page/datasets |
+| S9 | Mass.gov, Clean Peak Energy Standard program review (ACP) | https://www.mass.gov/info-details/clean-peak-energy-standard-program-review |
+| S10 | Modo Energy, Massachusetts CPEC for BESS (Jul 2026) | https://modoenergy.com/research/isone-ma-clean-peak-cpec-bess-battery-storage |
+| S11 | Nectar, National Grid MA Basic Service (Jan 2026) | https://nectarclimate.com/rates/massachusetts-electric-national-grid |
+| S12 | NuWatt, MA commercial demand-charge battery calculator (installed $/kWh; installer) | https://nuwattenergy.com/en/massachusetts/commercial-demand-charge-battery-calculator-2026 |
+| S13 | Energy-Storage.news, storage ITC after the One Big Beautiful Bill Act | https://www.energy-storage.news/us-energy-storage-to-retain-momentum-post-reconciliation-bill-near-term-rush-to-complete-projects/ |
+| S14 | IRS Notice 2026-15 (FEOC material assistance) | https://www.irs.gov/pub/irs-drop/n-26-15.pdf |
+| S15 | ISO New England, 2024 Electric Generator Air Emissions Report | https://www.iso-ne.com/static-assets/documents/100028/final-2024-air-emission-report.pdf |
+| S16 | Fraunhofer, comparative LCA of lithium-ion, sodium-ion and solid-state cells (2025) | https://publica.fraunhofer.de/handle/publica/480983 |
+| S17 | Challenge brief and REON hack slides (provided) | — |
+| S18 | REON one-pager "Who We Are" (provided) | — |
+| S19 | REON CTO Tim Ren, hack Discord, Nov 6–7, 2026 | Not public |
+| S20 | Methodology v1 (Annabelle) and repo annabelleywu/mitec2026 | https://github.com/annabelleywu/mitec2026 |
+
+Fuller Massachusetts market research with 42 sources: `MA_Economics_Research.md`.
