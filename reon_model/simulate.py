@@ -56,7 +56,11 @@ class PackConfig:
     switch_efficiency: float = 0.995 # conduction loss of per-cell switches
     repair_days: float = 14.0        # outage per service visit
     cycles_per_year: float = 365.0
-    retirement_retention: float = 0.70  # vs nameplate energy
+    retirement_retention: float = 0.70  # see retention_basis
+    retention_basis: str = "nameplate"   # "nameplate", or "bol": this design's own beginning-of-life energy (brief's R_sys)
+    rated_kw: float = 30.0               # inverter rating per block (REON EBS: 30 kW / 60 kWh)
+    event_hours: float = 2.0             # firm kW must be held this long (committed event)
+    v_floor: float = 2.5                 # per-cell discharge voltage floor for beta_power (placeholder)
     years: float = 15.0
     steps_per_year: int = 12
 
@@ -192,6 +196,12 @@ class HazardConfig:
         return np.array([self.coef[f] for f in FEATURES])
 
     @classmethod
+    def off(cls) -> "HazardConfig":
+        """No sudden faults. The paper's data has no fault events and describes gradual drift into a
+        knee, so value comparisons use this; the fault model stays available as a sensitivity."""
+        return cls(base_rate=0.0)
+
+    @classmethod
     def homogeneous(cls, rate: float) -> "HazardConfig":
         """All cells share one constant rate: the simple Poisson special case."""
         return cls(base_rate=rate, coef={f: 0.0 for f in FEATURES})
@@ -218,6 +228,36 @@ def discharge(Q, active, headroom):
 def usable_capacity(Q, active, headroom):
     """sum_i min(Q_i, Q_(h+1)) over active cells (see ``discharge``)."""
     return discharge(Q, active, headroom)[0]
+
+
+def beta_power(R, active, headroom, ocv_mid, v_floor):
+    """Power utilisation (Zhou et al. 2026, eq. 12, simplified), shape (P,).
+
+    Cells at a reference SOC with open-circuit voltage ``ocv_mid`` may each draw
+    I_i = (ocv_mid - v_floor) / R_i before hitting the voltage floor. Series cells
+    share one current, so a fixed string runs at min_i I_i and delivers
+    sum_j I (ocv_mid - R_j I). With bypass, up to ``headroom`` of the
+    highest-resistance active cells may be switched out first; the best case is
+    kept. The denominator is the sum of cell peak powers I_i * v_floor over the
+    active cells. The absolute resistance scale cancels.
+    """
+    R = np.asarray(R, dtype=float)
+    dv = ocv_mid - v_floor
+    Rs = np.sort(np.where(active, R, -np.inf), axis=1)[:, ::-1]      # active, highest resistance first
+    n_act = active.sum(axis=1)
+    denom = np.where(active, dv / np.where(active, R, 1.0) * v_floor, 0.0).sum(axis=1)
+    h_max = int(np.max(np.minimum(headroom, np.maximum(n_act - 1, 0)))) if len(n_act) else 0
+    best = np.zeros(R.shape[0])
+    valid = np.isfinite(Rs)
+    for d in range(h_max + 1):
+        Rd = Rs[:, d]
+        ok = (d <= np.minimum(headroom, n_act - 1)) & np.isfinite(Rd) & (Rd > 0)
+        I = np.where(ok, dv / np.where(ok, Rd, 1.0), 0.0)
+        keep = valid & (np.arange(R.shape[1])[None, :] >= d)
+        p = (I[:, None] * (ocv_mid - np.where(keep, Rs, 0.0) * I[:, None]) * keep).sum(axis=1)
+        best = np.where(ok, np.maximum(best, p), best)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(denom > 0, best / denom, np.nan)
 
 
 class _CellSlots:
@@ -300,6 +340,9 @@ class SimResult:
     isolated: np.ndarray | None = None   # (P,) cells proactively isolated over horizon
     rested_cell_steps: np.ndarray | None = None  # (P,) cell-steps spent resting
     rows: dict | None = None      # cell-period training rows on MEASURED features (if recorded)
+    firm_kw: np.ndarray | None = None     # (P, K) min(rated kW, usable kWh / event hours) x availability; 0 after retirement
+    beta_power: np.ndarray | None = None  # (P, K) power utilisation (see ``beta_power``)
+    beta_soh: np.ndarray | None = None    # (P, K) min / mean capacity of discharging cells
 
 
 def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
@@ -332,6 +375,8 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
     passed = np.zeros((P, N))                # charge each cell gave in the last discharge
     downtime_left = np.zeros(P)              # days of outage still to serve
     energy = np.zeros((P, K)); avail = np.ones((P, K))
+    bpow = np.zeros((P, K)); bsoh = np.zeros((P, K))
+    ocv_mid = float(monitoring.ocv_curve(0.5))
     faults = np.zeros(P); visits = np.zeros(P); isolated = np.zeros(P); rested_steps = np.zeros(P)
     rows = {"X": [], "events": [], "exposure": [], "pack": [], "t": []} if record_rows else None
     days_per_step = 365.0 * dt
@@ -362,6 +407,10 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
         if mode == "bypass":
             cap = cap * pack.switch_efficiency
         energy[:, k] = cap * pack.cell_ah * pack.v_nominal / 1000.0
+        bpow[:, k] = beta_power(R, discharging, headroom, ocv_mid, pack.v_floor)
+        Qd = np.where(discharging, Q, np.nan)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            bsoh[:, k] = np.nanmin(Qd, axis=1) / np.nanmean(Qd, axis=1)
 
         # --- faults within this step (exact for piecewise-constant hazard) -------
         cum_prev = slots.cum.copy()
@@ -399,7 +448,12 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
         monitor.reset_cells(swap)
         passed = np.where(swap, 0.0, passed)
 
-    retention = energy / pack.nameplate_kwh
+    if pack.retention_basis == "bol":
+        retention = energy / np.maximum(energy[:, :1], 1e-12)     # brief's R_sys: vs this design's own start
+    elif pack.retention_basis == "nameplate":
+        retention = energy / pack.nameplate_kwh
+    else:
+        raise ValueError(pack.retention_basis)
     below = retention < pack.retirement_retention
     first = np.where(below.any(axis=1), below.argmax(axis=1), K)
     retire = np.where(first < K, t_grid[np.minimum(first, K - 1)], np.inf)
@@ -409,8 +463,9 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
     if record_rows:
         rows = {key: np.concatenate(v) for key, v in rows.items()}
         rows["feature_names"] = names
+    firm_kw = np.minimum(pack.rated_kw, energy / pack.event_hours) * avail * in_life
     return SimResult(mode, t_grid, energy, retention, avail, faults, visits, retire, delivered,
-                     isolated, rested_steps, rows)
+                     isolated, rested_steps, rows, firm_kw, bpow, bsoh)
 
 
 def compare(n_packs=200, pack=PackConfig(), aging=AgingConfig(), hazard=HazardConfig(), seed=0,
@@ -420,5 +475,5 @@ def compare(n_packs=200, pack=PackConfig(), aging=AgingConfig(), hazard=HazardCo
             for m in ("fixed", "bypass")}
 
 
-__all__ = ["FEATURES", "PackConfig", "AgingConfig", "draw_cell_parameters", "HazardConfig", "SimResult",
+__all__ = ["FEATURES", "PackConfig", "AgingConfig", "draw_cell_parameters", "HazardConfig", "SimResult", "beta_power",
            "simulate", "compare", "discharge", "usable_capacity", "cell_features"]
