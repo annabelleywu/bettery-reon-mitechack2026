@@ -206,18 +206,18 @@ const CAL = { // calibrated on Zhou et al. 2026 (data/calibration_zhou2026.json)
   resGrowth: 7.48, r0CV: 0.059,
 };
 const DEFAULTS = {
-  N: 96, k: 4, eff: 99.5, retire: 70, denom: "nameplate", cpy: 365, packs: 48,
+  N: 250, k: 25, eff: 99.5, retire: 70, denom: "nameplate", cpy: 365, packs: 48,
   blockKWh: 60, ratedKW: 30, duration: 2, bmsOverhead: 4, sysCost: 600,
   // Massachusetts C&I application (Eversource Greater Boston G-2), see MA_Economics_Research.md
   nBlocks: 2, acEff: 96, rte: 88, csRate: 200, csHrs: 3, csEvents: 45, dcRate: 33.95, dcHrs: 2, dcRealize: 75,
   cpsClear: 87, cpsMult: 1.0, energyPrice: 0.20, itc: 30, discount: 8, startYear: 2027,
   gridCO2: 597, embodiedCO2: 80, cellKgPerKWh: 7, horizon: 20, restTemp: 0,
   bypassOnEmpty: true, bypassOnFault: true, isolateGap: 0, isoTemp: 0, isoRes: 0,
-  restCount: 2, restRule: "life", restThresh: 20, restGap: 0, restStop: 85, spare: 1,
+  restCount: 0, restRule: "life", restThresh: 20, restGap: 0, restStop: 85, spare: 1,
   spreadMult: 1, outlierFrac: 0, outlierKnee: 0.8,
   rateCV: 0.379, kneeCV: 0.044, slopeCV: 0.347, slopeShrink: 0.537, slopeRatio: 8.38, q0CV: 0.47, packKneeSD: 0.139,
   tempSD: 2.0, kneeAuto: true, kneeYears: 6.6, kCal: 0.020, kCyc: 10, throughput: true,
-  faultRate: 0, faultSoh: 10, repairDays: 14,
+  faultPPM: 0, faultSoh: 0, repairDays: 14, onFault: "repair", visitCost: 1500,
   sig: { voltage: { on: true, noise: 2 }, temperature: { on: true, noise: 0.5 }, soc: { on: true, noise: 1 },
          soh: { on: true, noise: 1 }, capacity: { on: true, noise: 1 }, resistance: { on: true, noise: 2 },
          ocv: { on: true, noise: 2 }, history: { on: true, noise: 6 } },
@@ -341,7 +341,8 @@ function simPack(p0, mode, pk, trace) {
   const bypassed = new Uint8Array(N), isolated = new Uint8Array(N);
   const Q = F(N), R = F(N), passed = F(N), rested = new Uint8Array(N), sortBuf = F(N), life = F(N), active = new Uint8Array(N);
   const energy = F(K), avail = F(K), bpow = F(K), restN = F(K);
-  let downtime = 0, visits = 0, faults = 0, nIso = 0, restSteps = 0;
+  let downtime = 0, visits = 0, faults = 0, nIso = 0, restSteps = 0, deadStep = K;
+  const visitM = F(K);
   const sig = p.sig, alpha = sig.history.on ? 2 / (Math.max(1, sig.history.noise) + 1) : 1;
   const canEstimate = (sig.capacity.on || sig.soh.on || sig.soc.on || sig.ocv.on || sig.voltage.on);
   const useEstimate = mode === "cell" && canEstimate && (p.isolateGap > 0 || p.restCount > 0);
@@ -464,24 +465,30 @@ function simPack(p0, mode, pk, trace) {
     }
     // ---- optional sudden faults (placeholder NHPP; the paper's data has none); cells out of the string are not at risk
     let newFaults = 0; const fault = [];
-    if (p.faultRate > 0) {
+    if (p.faultPPM > 0) {
       let mQ = 0, mT2 = 0, nIn = 0; const rr = [];
       for (let i = 0; i < N; i++) if (!bypassed[i]) { mQ += Q[i]; mT2 += c.temp[i]; nIn++; rr.push(R[i]); }
       mQ /= Math.max(nIn, 1); mT2 /= Math.max(nIn, 1); rr.sort((a, b) => a - b); const rMed2 = rr[rr.length >> 1] || 1;
       for (let i = 0; i < N; i++) {
         if (bypassed[i]) continue;
-        const lam = p.faultRate / 1000 * Math.exp(0.12 * (c.temp[i] - mT2) + p.faultSoh * (mQ - Q[i]) + 1.5 * (R[i] / rMed2 - 1));
+        // same rate for every cell unless the risk-factor slider is on (placeholder coefficients)
+        const lam = p.faultPPM * 1e-6 * (p.faultSoh > 0 ? Math.exp(0.12 * (c.temp[i] - mT2) + p.faultSoh * (mQ - Q[i]) + 1.5 * (R[i] / rMed2 - 1)) : 1);
         c.cum[i] += lam * DT;
         if (c.cum[i] >= c.budget[i]) { fault.push(i); newFaults++; }
       }
     }
     faults += newFaults;
     const swap = [];
+    let halt = false, nVisit = 0;   // the string cannot carry on: a fixed string at any fault, cell-level once > k cells are out
     if (mode === "fixed" || !p.bypassOnFault) {
-      visits += newFaults; downtime += newFaults * p.repairDays; for (const i of fault) swap.push(i);
+      halt = newFaults > 0; nVisit = newFaults; for (const i of fault) swap.push(i);
     } else {
       for (const i of fault) { bypassed[i] = 1; nOut++; }
-      if (nOut > kmax) { visits++; downtime += p.repairDays; for (let i = 0; i < N; i++) if (bypassed[i]) swap.push(i); }
+      if (nOut > kmax) { halt = true; nVisit = 1; for (let i = 0; i < N; i++) if (bypassed[i]) swap.push(i); }
+    }
+    if (deadStep === K && halt) {
+      if (p.onFault === "retire") deadStep = k + 1;          // the owner retires the block (worst case for the base system)
+      else { visits += nVisit; visitM[k] = nVisit; downtime += nVisit * p.repairDays; }
     }
     const served = Math.min(downtime, 365 / SPY); avail[k] = 1 - served / (365 / SPY); downtime -= served;
     // ---- age the cells by what each one actually did this month
@@ -496,10 +503,11 @@ function simPack(p0, mode, pk, trace) {
   const denom = p.denom === "bol" ? energy[0] : p.blockKWh;
   const ret = F(K); for (let k = 0; k < K; k++) ret[k] = energy[k] / denom;
   let first = K; for (let k = 0; k < K; k++) if (ret[k] * 100 < p.retire) { first = k; break; }
+  const byFault = deadStep < first; first = Math.min(first, deadStep);
   let mwh = 0; for (let k = 0; k < first; k++) mwh += energy[k] * avail[k] * p.cpy * DT / 1000;
   let av = 0; for (let k = 0; k < K; k++) av += avail[k];
   const firmKW = F(K); for (let k = 0; k < K; k++) firmKW[k] = k < first ? Math.min(p.ratedKW, energy[k] / p.duration) * avail[k] : 0;
-  return { energy, availM: avail, ret, firmKW, bpow, life: first * DT, mwh, visits, faults, avail: av / K, nIso, restSteps, tr };
+  return { energy, availM: avail, ret, firmKW, bpow, life: first * DT, mwh, visits, faults, avail: av / K, nIso, restSteps, tr, visitM, byFault };
 }
 
 // ---------------------------------------------------------------- Massachusetts C&I economics (per block)
@@ -510,7 +518,7 @@ function simPack(p0, mode, pk, trace) {
 function econPack(x, mode, p) {
   const ac = p.acEff / 100, lifeM = Math.round(x.life / DT), nYears = Math.ceil(lifeM / SPY);
   const capex = p.sysCost * p.blockKWh * (1 + (mode === "cell" ? p.bmsOverhead / 100 : 0)) * (1 - p.itc / 100);
-  let npv = -capex, cum = -capex, payback = NaN, y1 = null, mwhAC = 0;
+  let npv = -capex, cum = -capex, payback = NaN, y1 = null, mwhAC = 0, visits$ = 0;
   for (let y = 0; y < nYears; y++) {
     let e = 0, av = 0, n = 0;
     for (let k = y * SPY; k < Math.min((y + 1) * SPY, lifeM); k++) { e += x.energy[k]; av += x.availM[k]; n++; }
@@ -522,13 +530,16 @@ function econPack(x, mode, p) {
     const cps = (p.cpsClear / 100) * acp * p.cpsMult * (E / 1000) * Math.max(p.cpy - p.csEvents, 0) * frac * A;
     const mwh = (E / 1000) * p.cpy * frac * A;
     const loss = mwh * (100 / p.rte - 1) * p.energyPrice * 1000;
-    const net = cs + dc + cps - loss;
+    let nv = 0; for (let k = y * SPY; k < Math.min((y + 1) * SPY, lifeM); k++) nv += x.visitM ? x.visitM[k] : 0;
+    const visit = nv * p.visitCost;
+    const net = cs + dc + cps - loss - visit;
     mwhAC += mwh;
     npv += net / Math.pow(1 + p.discount / 100, y + 1);
     const prev = cum; cum += net; if (isNaN(payback) && cum >= 0) payback = y + (net > 0 ? -prev / net : 0);
     if (y === 0) y1 = { cs, dc, cps, loss, net };
+    visits$ += visit;
   }
-  return { npv, capex, payback, y1, mwhAC };
+  return { npv, capex, payback, y1, mwhAC, visits$ };
 }
 function pct(arr, q) { const a = Float64Array.from(arr).sort(); const i = (a.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i); return a[lo] + (a[hi] - a[lo]) * (i - lo); }
 const F64 = n => new Float64Array(n);
@@ -543,6 +554,7 @@ function runAll(p, packs, withBands) {
       lifeMed: pct(r.map(x => x.life), 0.5), mwhMed: pct(r.map(x => x.mwh), 0.5), visits: pct(r.map(x => x.visits), 0.5),
       avail: r.reduce((s, x) => s + x.avail, 0) / packs, iso: r.reduce((s, x) => s + x.nIso, 0) / packs,
       rest: r.reduce((s, x) => s + x.restSteps, 0) / packs, tr: r[0].tr,
+      lost: r.reduce((s, x) => s + (x.byFault ? 1 : 0), 0) / packs, visitsMean: r.reduce((s, x) => s + x.visits, 0) / packs,
       kw: F64(K), bp: F64(K) };
     for (let k = 0; k < K; k++) { o.kw[k] = pct(r.map(x => x.firmKW[k]), 0.5); o.bp[k] = pct(r.map(x => x.bpow[k]), 0.5); }
     if (withBands) {
@@ -571,8 +583,8 @@ function runAll(p, packs, withBands) {
 // ---------------------------------------------------------------- controls
 const GROUPS = [
   { id: "pack", title: "Pack and system limits", tag: "", open: true, items: [
-    { id: "k", label: "Bypass headroom k (cells the voltage window lets drop out)", min: 0, max: 48, step: 1, fmt: v => `${v} cells`, note: "Ask REON for the real value." },
-    { id: "N", label: "Cells in series", min: 16, max: 192, step: 8, fmt: v => `${v}` },
+    { id: "k", label: "Backup cells k (cells that can be out of the string at once)", min: 0, max: 125, step: 1, fmt: v => `${v} cells`, note: "REON (Tim Ren): about 10% of the string is redundant backup cells, rotated in and out." },
+    { id: "N", label: "Cells in series", min: 16, max: 300, step: 2, fmt: v => `${v}`, note: "REON: 200–300 cells in one string." },
     { id: "cpy", label: "Cycles per year", min: 50, max: 730, step: 5, fmt: v => `${v}` },
   ] },
   { id: "metrics", title: "Outputs and retirement", tag: "", open: true, items: [
@@ -640,13 +652,15 @@ const GROUPS = [
     { id: "kCyc", label: "Fade per million cycles", min: 0, max: 40, step: 0.5, fmt: v => `${v.toFixed(1)} ×1e-6`, note: "Assumption (×1e-6 per full cycle)" },
     { type: "toggle", id: "throughput", label: "Cycle aging follows each cell's own use", note: "Resting or bypassing a cell slows its cycle aging." },
   ] },
-  { id: "faults", title: "Sudden faults (not in the paper's data)", tag: "ph", tagText: "placeholder", open: false, items: [
-    { id: "faultRate", label: "Base fault rate per 1000 cell-years", min: 0, max: 10, step: 0.1, fmt: v => v ? v.toFixed(1) : "off", note: "Off by default. The paper and field experience describe slow drift into a knee, not sudden failures; it has no fault events to calibrate on." },
-    { id: "faultSoh", label: "Fault risk rise for cells weaker than the pack", min: 0, max: 30, step: 0.5, fmt: v => v.toFixed(1), needs: "faults" },
+  { id: "faults", title: "Hard cell failures (single point of failure)", tag: "ph", tagText: "assumed rates", open: false, items: [
+    { id: "faultPPM", label: "Cell failures per million cell-years", min: 0, max: 2000, step: 10, fmt: v => v ? `${v} ppm (${(v / 1e4).toFixed(2)}%/y)` : "off", note: "No public per-cell field rate exists. Try 10, 100 and 1,000 ppm (Tim's 0.1% example). A fixed string stops at any failure; REON switches the cell out." },
+    { type: "choice", id: "onFault", label: "When a string can't carry on", options: [["repair", "Repair: outage, then swap the cell"], ["retire", "Retire the block (worst case for the base system)"]], needs: "faults" },
     { id: "repairDays", label: "Outage per service visit", min: 0, max: 60, step: 1, fmt: v => `${v} days`, needs: "faults" },
+    { id: "visitCost", label: "Cost per service visit", min: 0, max: 5000, step: 100, fmt: v => `$${v.toLocaleString()}`, needs: "faults", note: "Placeholder; a solar truck roll alone is $250+." },
+    { id: "faultSoh", label: "Extra risk for weak, hot or high-resistance cells", min: 0, max: 30, step: 0.5, fmt: v => v ? v.toFixed(1) : "off (same rate for every cell)", needs: "faults" },
   ] },
   { id: "run", title: "Simulation", tag: "", open: false, items: [
-    { id: "packs", label: "Simulated packs (more is smoother, slower)", min: 8, max: 160, step: 8, fmt: v => `${v}`, note: "Gains are means over paired packs. The first 48 packs read about 1 point high on energy and life; at 2,000 packs the browser gives +6.8% energy, +8.2% life, +$3.5k per site. Slide numbers (Python, 3,000 packs): +6.5%, +8.0%, +$3.0k. Bypass alone agrees within 0.2 points; the resting gap comes from how each version estimates capacity (the browser fuses all signals)." },
+    { id: "packs", label: "Simulated packs (more is smoother, slower)", min: 8, max: 160, step: 8, fmt: v => `${v}`, note: "Gains are means over paired packs. At 1,000 packs the browser gives +12.3% energy, +10.7% life, +$9.4k per site; slide numbers (Python, 2,000 packs): +12.1%, +10.6%, +$9.1k. The 48-pack default moves by about ±0.5 points." },
   ] },
 ];
 const SIGNALS = [
@@ -705,8 +719,8 @@ function buildControls() {
   }
   const reset = document.createElement("button"); reset.type = "button"; reset.textContent = "Reset to defaults";
   reset.addEventListener("click", () => { P = clone(DEFAULTS); buildControls(); changed(); });
-  const best = document.createElement("button"); best.type = "button"; best.textContent = "Compare: bypass on empty only (no resting)";
-  best.addEventListener("click", () => { P = Object.assign(clone(DEFAULTS), { restCount: 0 }); buildControls(); changed(); });
+  const best = document.createElement("button"); best.type = "button"; best.textContent = "Show REON's 2–3× case: 0.1% cell failures, base block retired at first failure";
+  best.addEventListener("click", () => { P = Object.assign(clone(DEFAULTS), { faultPPM: 1000, onFault: "retire" }); buildControls(); changed(); });
   const btns = document.createElement("div"); btns.style.cssText = "display:flex;flex-wrap:wrap;gap:8px"; btns.append(reset, best);
   rail.appendChild(btns);
   syncAvailability();
@@ -719,7 +733,7 @@ function needOk(n) {
     case "ruleLife": return canEst(P) && P.restCount > 0 && P.restRule === "life";
     case "ruleHealth": return canEst(P) && P.restCount > 0 && P.restRule === "health";
     case "manualKnee": return !P.kneeAuto;
-    case "faults": return P.faultRate > 0;
+    case "faults": return P.faultPPM > 0;
     default: return P.sig[n].on;
   }
 }
@@ -759,7 +773,9 @@ function renderKPIs(cur, def, k) {
   sec.push(`<span><b>Break-even</b> energy gain must exceed the +${P.bmsOverhead.toFixed(1)}% BMS overhead; now ${gainE >= 0 ? "+" : ""}${gainE.toFixed(1)}%</span>`);
   if (P.restCount > 0) sec.push(`<span><b>Resting</b> ${c.rest.toFixed(0)} cell-months per pack over life</span>`);
   if (c.iso > 0.05) sec.push(`<span><b>Isolated</b> ${c.iso.toFixed(1)} cells per pack</span>`);
-  if (P.faultRate > 0) sec.push(`<span><b>Outages (placeholder faults)</b> fixed ${f.visits.toFixed(0)} · cell ${c.visits.toFixed(0)}</span><span><b>Availability</b> fixed ${(100 * f.avail).toFixed(2)}% · cell ${(100 * c.avail).toFixed(2)}%</span>`);
+  if (P.faultPPM > 0) sec.push(P.onFault === "retire"
+    ? `<span><b>Blocks lost to a cell failure</b> fixed ${(100 * f.lost).toFixed(0)}% · cell-level ${(100 * c.lost).toFixed(0)}%</span>`
+    : `<span><b>Service visits per block</b> fixed ${f.visitsMean.toFixed(1)} · cell-level ${c.visitsMean.toFixed(1)}</span><span><b>Availability</b> fixed ${(100 * f.avail).toFixed(2)}% · cell ${(100 * c.avail).toFixed(2)}%</span>`);
   $("kpis2").innerHTML = sec.join("");
 }
 

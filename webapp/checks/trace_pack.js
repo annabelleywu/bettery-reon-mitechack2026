@@ -2,7 +2,8 @@
 // (sum over active cells of min(Q_i, stop), stop = (h+1)-th weakest active cell) and checks the
 // resting rule targets the cells that end up weakest. Usage: node webapp/checks/trace_pack.js [pack=3]
 const M = require("./load_model");
-const p = M.clone(M.DEFAULTS), N = p.N, pk = +(process.argv[2] || 3);
+// resting on (2 cells) so the trace also exercises the resting rule
+const p = Object.assign(M.clone(M.DEFAULTS), { restCount: 2 }), N = p.N, pk = +(process.argv[2] || 3);
 const f = M.simPack(p, "fixed", pk, true), c = M.simPack(p, "cell", pk, true);
 const cellAh = p.blockKWh * 1000 / (N * 3.1);
 let bad = 0;
@@ -28,4 +29,4 @@ for (let q = 0; q < 200; q++) {
   const rested = new Set(); for (let k = 0; k < M.K; k++) for (let i = 0; i < N; i++) if (cc.tr.st[k * N + i] === 1) rested.add(i);
   for (const i of rested) { tot++; if (weak.has(i)) hits++; }
 }
-console.log(`resting targets: ${(100 * hits / tot).toFixed(0)}% of rested cells are among the 10 weakest at the fixed twin's retirement (random: 10%)`);
+console.log(`resting targets: ${(100 * hits / tot).toFixed(0)}% of rested cells are among the 10 weakest at the fixed twin's retirement (random: ${(1000 / N).toFixed(0)}%)`);

@@ -3,7 +3,8 @@
 // beta_energy = beta_life x <beta_SOC>; the model has no SOC imbalance (beta_SOC = 1; paper: > 0.98).
 // beta_power at beginning of life (paper eq. 12-16, simplified). Usage: node webapp/checks/paper_metrics.js [packs=400]
 const M = require("./load_model");
-const p = M.clone(M.DEFAULTS), N = p.N, n = +(process.argv[2] || 400);
+// 96 cells, like the paper's 95-cell car packs (the default EBS string has 250)
+const p = Object.assign(M.clone(M.DEFAULTS), { N: 96, k: 4 }), N = p.N, n = +(process.argv[2] || 400);
 const bl = [], bp = [];
 for (let pk = 0; pk < n; pk++) {
   const x = M.simPack(p, "fixed", pk, true), Q = x.tr.Q, t = new Float64Array(N).fill(M.YEARS);
