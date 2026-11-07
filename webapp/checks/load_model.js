@@ -4,5 +4,5 @@ const fs = require("fs"), path = require("path");
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const start = html.indexOf('"use strict";'), end = html.indexOf("// ---------------------------------------------------------------- controls");
 if (start < 0 || end < 0) throw new Error("model markers not found in index.html");
-const names = ["DEFAULTS", "CAL", "YEARS", "SPY", "K", "DT", "clone", "simPack", "runAll", "econPack", "pct"];
+const names = ["DEFAULTS", "CAL", "YEARS", "SPY", "K", "DT", "clone", "simPack", "runAll", "econPack", "econHorizon", "pct"];
 module.exports = new Function(html.slice(start, end) + `\nreturn { ${names.join(", ")} };`)();

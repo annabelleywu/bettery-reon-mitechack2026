@@ -209,9 +209,9 @@ const DEFAULTS = {
   N: 250, k: 25, eff: 99.5, retire: 70, denom: "nameplate", cpy: 365, packs: 48,
   blockKWh: 60, ratedKW: 30, duration: 2, bmsOverhead: 4, sysCost: 600,
   // Massachusetts C&I application (Eversource Greater Boston G-2), see MA_Economics_Research.md
-  nBlocks: 2, acEff: 96, rte: 88, csRate: 200, csHrs: 3, csEvents: 45, dcRate: 33.95, dcHrs: 2, dcRealize: 75,
+  nBlocks: 2, acEff: 96, rte: 88, csRate: 200, csHrs: 3, csEvents: 45, dcRate: 33.95, dcHrs: 2, dcRealize: 50,
   cpsClear: 87, cpsMult: 1.0, energyPrice: 0.20, itc: 30, discount: 8, startYear: 2027,
-  gridCO2: 597, embodiedCO2: 80, cellKgPerKWh: 7, horizon: 20, restTemp: 0,
+  gridCO2: 597, embodiedCO2: 80, cellKgPerKWh: 7, horizon: 20, restTemp: 0, fom: 2.5,
   bypassOnEmpty: true, bypassOnFault: true, isolateGap: 0, isoTemp: 0, isoRes: 0,
   restCount: 0, restRule: "life", restThresh: 20, restGap: 0, restStop: 85, spare: 1,
   spreadMult: 1, outlierFrac: 0, outlierKnee: 0.8,
@@ -541,6 +541,47 @@ function econPack(x, mode, p) {
   }
   return { npv, capex, payback, y1, mwhAC, visits$ };
 }
+// ---------------------------------------------------------------- 20-year service horizon (the fair money comparison)
+// When a block retires the owner buys a new one at that year's price and ITC rate. Replacement j of pack i behaves like
+// simulated pack (i + 7919 j) mod P (fresh, independent cells; same mapping in both designs). Fixed O&M 2.5% of
+// installed cost a year (NREL ATB, commercial battery storage). Straight-line salvage for the block in service at the end.
+const COST_CURVE = [[2024, 1.00], [2030, 0.84], [2035, 0.73], [2040, 0.66], [2050, 0.53]]; // NREL 2025 update, mid case
+function costCurve(y) { for (let k = 1; k < COST_CURVE.length; k++) { const [x0, y0] = COST_CURVE[k - 1], [x1, y1] = COST_CURVE[k]; if (y <= x1) return y0 + (y1 - y0) * Math.max(0, y - x0) / (x1 - x0); } return COST_CURVE[COST_CURVE.length - 1][1]; }
+function costFactor(y, p) { return costCurve(y) / costCurve(p.startYear); }
+function itcRate(y, p) { return (p.itc / 100) * (y <= 2033 ? 1 : y === 2034 ? 0.75 : y === 2035 ? 0.5 : 0); } // OBBBA storage schedule
+function econHorizon(R, i, mode, p) {
+  const P = R.length, H = Math.round(p.horizon * SPY), ac = p.acEff / 100, over = 1 + (mode === "cell" ? p.bmsOverhead / 100 : 0);
+  const E = F64(H), A = F64(H).fill(1), V = F64(H); const capex = [];
+  let m = 0, j = 0, salvage = 0;
+  while (m < H) {
+    const x = R[(i + j * 7919) % P], L = Math.max(1, Math.round(x.life / DT)), yr = p.startYear + m / SPY;
+    const paid = p.sysCost * costFactor(yr, p) * p.blockKWh * over * (1 - itcRate(Math.floor(yr), p));
+    capex.push([m, paid]);
+    const n = Math.min(L, H - m);
+    for (let k = 0; k < n; k++) { E[m + k] = x.energy[k]; A[m + k] = x.availM[k]; V[m + k] = x.visitM ? x.visitM[k] : 0; }
+    if (m + L > H) salvage = paid * (m + L - H) / L;
+    m += L; j++;
+  }
+  const disc = mm => Math.pow(1 + p.discount / 100, -mm / SPY);
+  let npv = 0, capPV = 0; for (const [mm, c] of capex) { npv -= c * disc(mm); capPV += c * disc(mm); }
+  const om = (p.fom / 100) * p.sysCost * p.blockKWh;
+  let revPV = 0, omPV = 0, mwh = 0, cum = -capex[0][1], payback = NaN;
+  for (let y = 0; y < p.horizon; y++) {
+    let e = 0, a = 0, v = 0; for (let k = y * SPY; k < (y + 1) * SPY; k++) { e += E[k]; a += A[k]; v += V[k]; }
+    e = e / SPY * ac; a /= SPY;
+    const cs = p.csRate * Math.min(p.ratedKW, e / p.csHrs) * a;
+    const dc = 12 * p.dcRate * (p.dcRealize / 100) * Math.min(p.ratedKW, e / p.dcHrs) * a;
+    const acp = p.startYear + y <= 2032 ? 65 : 45;
+    const cps = (p.cpsClear / 100) * acp * p.cpsMult * (e / 1000) * Math.max(p.cpy - p.csEvents, 0) * a;
+    const mw = (e / 1000) * p.cpy * a, loss = mw * (100 / p.rte - 1) * p.energyPrice * 1000;
+    const net = cs + dc + cps - loss - v * p.visitCost - om, d = Math.pow(1 + p.discount / 100, y + 1);
+    npv += net / d; revPV += (cs + dc + cps) / d; omPV += om / d; mwh += mw;
+    let rep = 0; for (const [mm, c] of capex.slice(1)) if (mm >= y * SPY && mm < (y + 1) * SPY) rep += c;
+    const prev = cum; cum += net - rep; if (isNaN(payback) && cum >= 0) payback = y + (net > 0 ? -prev / net : 0);
+  }
+  const sv = salvage * disc(H);
+  return { npv: npv + sv, capexPV: capPV, revenuePV: revPV, omPV, salvagePV: sv, blocks: j, mwh, payback: isNaN(payback) ? 99 : payback };
+}
 function pct(arr, q) { const a = Float64Array.from(arr).sort(); const i = (a.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i); return a[lo] + (a[hi] - a[lo]) * (i - lo); }
 const F64 = n => new Float64Array(n);
 function runAll(p, packs, withBands) {
@@ -576,6 +617,12 @@ function runAll(p, packs, withBands) {
     dNPV: pct(ec.map((e, i) => e.npv - ef[i].npv), 0.5), dNPVp10: pct(ec.map((e, i) => e.npv - ef[i].npv), 0.1), dNPVp90: pct(ec.map((e, i) => e.npv - ef[i].npv), 0.9),
     dMWhAC: pct(ec.map((e, i) => e.mwhAC - ef[i].mwhAC), 0.5),
   };
+  const hf = res.fixed.map((x, i) => econHorizon(res.fixed, i, "fixed", p)), hc = res.cell.map((x, i) => econHorizon(res.cell, i, "cell", p));
+  const mean = (a, f) => a.reduce((s, x) => s + f(x), 0) / a.length;
+  const sum1 = a => ({ npv: mean(a, e => e.npv), capexPV: mean(a, e => e.capexPV), revenuePV: mean(a, e => e.revenuePV), omPV: mean(a, e => e.omPV),
+    salvagePV: mean(a, e => e.salvagePV), blocks: mean(a, e => e.blocks), mwh: mean(a, e => e.mwh), payback: pct(a.map(e => e.payback), 0.5) });
+  const dH = hc.map((e, i) => e.npv - hf[i].npv);
+  out.horizon = { fixed: sum1(hf), cell: sum1(hc), dNPV: mean(dH, x => x), dNPVp10: pct(dH, 0.1), dNPVp90: pct(dH, 0.9) };
   return out;
   
 }
@@ -599,20 +646,21 @@ const GROUPS = [
     { id: "csHrs", label: "Event length the battery must hold", min: 2, max: 3, step: 0.5, fmt: v => `${v} h`, note: "Events run 2–3 h; 3 h is the conservative case." },
     { id: "dcRate", label: "Demand charge", min: 5, max: 45, step: 0.05, fmt: v => `$${v.toFixed(2)}/kW-month`, note: "Eversource Greater Boston G-2: $20.21 distribution + $13.74 transmission = $33.95 (Jul 2026). National Grid G-2: $15.06." },
     { id: "dcHrs", label: "Peak-shaving duration", min: 1, max: 4, step: 0.5, fmt: v => `${v} h`, note: "Placeholder: how long the site's monthly peak lasts. Set from a ComStock load profile." },
-    { id: "dcRealize", label: "Share of theoretical demand savings realized", min: 30, max: 100, step: 5, fmt: v => `${v}%`, note: "Placeholder: forecasting misses and coincident peaks." },
+    { id: "dcRealize", label: "Share of theoretical demand savings realized", min: 30, max: 100, step: 5, fmt: v => `${v}%`, note: "Assumed 50% (conservative; 75% as upside): forecasting misses and peaks the battery cannot cover." },
     { id: "cpsClear", label: "Clean Peak certificate price, share of ACP", min: 50, max: 100, step: 1, fmt: v => `${v}%`, note: "ACP $65/MWh 2026–2032, $45 after (mass.gov). CPECs have cleared ~87% of ACP (Modo Energy)." },
     { id: "cpsMult", label: "Clean Peak multiplier", min: 0.5, max: 2, step: 0.1, fmt: v => `${v.toFixed(1)}×`, note: "Merchant storage earns 1.0–2.0× (Modo). 1.0 is conservative. No double-counting with ConnectedSolutions event days." },
     { id: "energyPrice", label: "Energy price (cost of battery losses)", min: 0.05, max: 0.40, step: 0.01, fmt: v => `$${v.toFixed(2)}/kWh`, note: "National Grid commercial Basic Service ~21.7 ¢/kWh (Jan 2026)." },
     { id: "rte", label: "Round-trip efficiency", min: 70, max: 98, step: 1, fmt: v => `${v}%`, note: "Placeholder; ask REON." },
     { id: "acEff", label: "Inverter efficiency (DC to AC boundary)", min: 90, max: 99, step: 0.5, fmt: v => `${v}%`, note: "Placeholder. All kW, kWh and $ are at the AC meter, as the brief asks." },
-    { id: "sysCost", label: "Installed system cost", min: 200, max: 1000, step: 10, fmt: v => `$${v}/kWh`, note: "Placeholder. Installer data for small MA C&I: ~$500–800/kWh installed. Ask REON." },
+    { id: "sysCost", label: "Installed system cost", min: 200, max: 1000, step: 10, fmt: v => `$${v}/kWh`, note: "Assumed $600 for a 2-hour system. Cross-check: NREL ATB commercial 4-hour system ~$480/kWh (2020$); shorter systems cost more per kWh. Ask REON." },
+    { id: "fom", label: "Fixed O&M per year, share of installed cost", min: 0, max: 5, step: 0.5, fmt: v => `${v}%`, note: "NREL ATB commercial battery storage: 2.5%." },
     { id: "itc", label: "Federal investment tax credit", min: 0, max: 40, step: 5, fmt: v => `${v}%`, note: "Storage keeps the ITC for projects starting construction by 2033, subject to FEOC sourcing rules (cell origin: ask REON)." },
     { id: "discount", label: "Discount rate", min: 3, max: 15, step: 0.5, fmt: v => `${v}%` },
     { id: "startYear", label: "First year of operation", min: 2026, max: 2030, step: 1, fmt: v => `${v}` },
     { id: "gridCO2", label: "Grid CO₂ displaced by delivered energy", min: 200, max: 1200, step: 10, fmt: v => `${v} lb/MWh`, note: "ISO-NE 2024 average: 597 lb/MWh. Peak marginal units emit more, so this is conservative. Assumes the battery charges from on-site solar." },
     { id: "embodiedCO2", label: "Embodied CO₂ of new cells", min: 30, max: 150, step: 1, fmt: v => `${v} kg/kWh`, note: "Fraunhofer comparative LCA (2025): sodium-ion 75–87, LFP 58–92 kg CO₂e/kWh cell. Replace with REON's LCA." },
     { id: "cellKgPerKWh", label: "Cell mass", min: 3, max: 15, step: 0.5, fmt: v => `${v} kg/kWh`, note: "Placeholder; ask REON for the EBS cell mass." },
-    { id: "horizon", label: "Years of storage service the owner needs", min: 10, max: 30, step: 1, fmt: v => `${v} y`, note: "For cells avoided: replacements needed over this horizon at each design's service life." },
+    { id: "horizon", label: "Years of storage service the owner needs", min: 10, max: 30, step: 1, fmt: v => `${v} y`, note: "Money is compared over this horizon: retired blocks are replaced at that year's price (NREL 2025 mid-case decline) and ITC rate (30% through 2033, 22.5% in 2034, 15% in 2035, then 0)." },
   ] },
   { id: "switch", title: "Cost of cell-level control", tag: "ph", tagText: "ask REON", open: true, items: [
     { id: "eff", label: "Switch efficiency", min: 97, max: 100, step: 0.1, fmt: v => `${v.toFixed(1)}%`, note: "Placeholder: conduction loss of the per-cell switches." },
@@ -793,7 +841,8 @@ function renderEcon(cur) {
   const embCO2 = avoidKWh * P.embodiedCO2 / 1000;          // t
   const mass = avoidKWh * P.cellKgPerKWh;                    // kg
   const capPerF = (f.capex * n) / (f.mwhAC * n), capPerC = (c.capex * n) / (c.mwhAC * n);
-  $("econTitle").textContent = `Value for a Massachusetts C&I owner: ${n} × REON EBS (${n * 30} kW / ${kWh} kWh), Eversource G-2, from ${P.startYear}`;
+  $("econTitle").textContent = `Value for a Massachusetts C&I owner: ${n} × REON EBS (${n * 30} kW / ${kWh} kWh), ${tariffName(P.dcRate)}, from ${P.startYear}`;
+  const h = cur.horizon, hf = h.fixed, hc = h.cell;
   $("econBody").innerHTML = `<table class="econ"><thead><tr><th></th><th class="num">Fixed string</th><th class="num cellc">Cell-level control</th><th class="num">Difference</th></tr></thead><tbody>
     ${row("Installed cost after ITC", f.capex * n, c.capex * n, money, `incl. +${P.bmsOverhead}% REON BMS overhead`, true)}
     ${row("Year 1: ConnectedSolutions", f.cs * n, c.cs * n)}
@@ -805,8 +854,16 @@ function renderEcon(cur) {
     ${row("NPV over service life", f.npv * n, c.npv * n, money, `${P.discount}% discount; life ${lifeF.toFixed(1)} vs ${lifeC.toFixed(1)} y`)}
     ${row("Energy delivered over life (AC)", f.mwhAC * n, c.mwhAC * n, v => `${v.toFixed(0)} MWh`)}
     ${row("Installed cost per delivered MWh", capPerF, capPerC, money, "", true)}
+    <tr><td colspan="4"><b>Over a ${P.horizon}-year service horizon</b> <small>Retired blocks are replaced at that year's price (NREL 2025 mid-case decline) and ITC rate; fixed O&amp;M ${P.fom}% of installed cost a year (NREL ATB); salvage for the block in service at the end</small></td></tr>
+    ${row("Blocks bought over the horizon", hf.blocks * n, hc.blocks * n, v => v.toFixed(1), "", true)}
+    ${row("Installed cost, present value", hf.capexPV * n, hc.capexPV * n, money, "", true)}
+    ${row("Revenue, present value", hf.revenuePV * n, hc.revenuePV * n)}
+    ${row("Fixed O&amp;M, present value", -hf.omPV * n, -hc.omPV * n)}
+    ${row("Salvage at the end, present value", hf.salvagePV * n, hc.salvagePV * n)}
+    ${row(`${P.horizon}-year NPV`, hf.npv * n, hc.npv * n)}
+    ${row("Simple payback (horizon)", hf.payback, hc.payback, yrs, "", true)}
     </tbody></table>
-    <p class="econsum"><b>NPV gain from cell-level control:</b> <span class="${e.dNPV > 0 ? "pos" : "neg"}">${money(e.dNPV * n)}</span> per site (P10 ${money(e.dNPVp10 * n)}, P90 ${money(e.dNPVp90 * n)}; paired, same cells)
+    <p class="econsum"><b>${P.horizon}-year NPV gain from cell-level control:</b> <span class="${h.dNPV > 0 ? "pos" : "neg"}">${money(h.dNPV * n)}</span> per site (P10 ${money(h.dNPVp10 * n)}, P90 ${money(h.dNPVp90 * n)}; paired, same cells) · over each design's own first life: ${money(e.dNPV * n)}
     · <b>CO₂ avoided:</b> ${opCO2.toFixed(1)} t from extra delivered energy + ${embCO2.toFixed(1)} t of cell manufacturing avoided over ${P.horizon} y
     · <b>Material kept out of waste:</b> ${(mass).toFixed(0)} kg of cells (${avoidKWh.toFixed(0)} kWh of replacement capacity not built)</p>`;
 }
@@ -930,6 +987,7 @@ function recompute() {
   CUR = runAll(P, P.packs, true);
   renderTime();
   renderEcon(CUR);
+  renderCustomer(CUR);
   $("status").textContent = `${P.packs} packs × 2 designs × ${YEARS} years in ${Math.round(performance.now() - t0)} ms`;
   runSweeps(++sweepToken);
 }
@@ -943,6 +1001,76 @@ $("play").addEventListener("click", () => {
   if (parseInt($("year").value, 10) >= K - 1) $("year").value = 0;
   playing = setInterval(() => { const v = parseInt($("year").value, 10) + 1; if (v >= K) { clearInterval(playing); playing = null; $("play").textContent = "Play"; return; } $("year").value = v; renderTime(); }, 60);
 });
+
+// ---------------------------------------------------------------- customer view (a second tab; the engineering view is unchanged)
+function tariffName(r) { return Math.abs(r - 41.65) < 0.01 ? "Eversource G-1 demand option" : Math.abs(r - 33.95) < 0.01 ? "Eversource G-2" : Math.abs(r - 30.05) < 0.01 ? "Eversource G-3" : Math.abs(r - 15.06) < 0.01 ? "National Grid G-2" : `$${r.toFixed(2)}/kW demand charge`; }
+const CUSTOMERS = [
+  { id: "grocer", name: "Neighborhood grocer", blurb: "Refrigeration-heavy small business, Eversource G-1 demand option ($41.65/kW), 2 blocks", set: { dcRate: 41.65, nBlocks: 2 } },
+  { id: "mid", name: "Mid-size business", blurb: "Eversource G-2 ($33.95/kW), 2 blocks", set: { dcRate: 33.95, nBlocks: 2 } },
+  { id: "cold", name: "Cold-storage warehouse", blurb: "Large site such as a regional cold store, Eversource G-3 ($30.05/kW), 10 blocks", set: { dcRate: 30.05, nBlocks: 10 } },
+];
+(function buildTabs() {
+  const st = document.createElement("style");
+  st.textContent = `.tabs{display:flex;gap:6px;margin:0 0 14px}.tabs button{border-radius:999px;padding:7px 16px;font-weight:500}.tabs button[aria-selected=true]{background:var(--cell);color:#fff;border-color:var(--cell)}
+  .cv{display:flex;flex-direction:column;gap:16px}.cv .row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}@media(max-width:1000px){.cv .row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .cv .big{padding:14px;border:1px solid var(--line, #d9dde5);border-radius:12px;background:var(--card, transparent)}.cv .big .lab{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .cv .big .val{font-size:28px;font-weight:600;color:var(--cell);margin:4px 0}.cv .big .sub{font-size:12.5px;color:var(--muted)}.cv .pick{display:flex;flex-wrap:wrap;gap:8px}.cv .pick button[aria-pressed=true]{border-color:var(--cell);box-shadow:inset 0 0 0 1px var(--cell)}
+  .cv .why{font-size:14px;line-height:1.5}.cv .why b{color:var(--ink)}.cv .fine{font-size:11.5px;color:var(--muted)}`;
+  document.head.appendChild(st);
+  const grid = document.querySelector(".grid"), tabs = document.createElement("div"); tabs.className = "tabs"; tabs.setAttribute("role", "tablist");
+  const mk = (id, label) => { const b = document.createElement("button"); b.type = "button"; b.id = id; b.textContent = label; b.setAttribute("role", "tab"); return b; };
+  const tc = mk("tabCust", "Customer view"), te = mk("tabEng", "Engineering view"); tabs.append(tc, te);
+  const cv = document.createElement("section"); cv.className = "cv"; cv.id = "cview";
+  grid.parentNode.insertBefore(tabs, grid); grid.parentNode.insertBefore(cv, grid);
+  const show = c => { cv.style.display = c ? "" : "none"; grid.style.display = c ? "none" : ""; tc.setAttribute("aria-selected", c); te.setAttribute("aria-selected", !c); try { localStorage.setItem("reonTab", c ? "c" : "e"); } catch (e) {} };
+  tc.addEventListener("click", () => show(true)); te.addEventListener("click", () => show(false));
+  let saved = "c"; try { saved = localStorage.getItem("reonTab") || "c"; } catch (e) {}
+  show(saved !== "e");
+})();
+function setCustomer(c) { Object.assign(P, c.set); buildControls(); changed(); }
+function renderCustomer(cur) {
+  const n = P.nBlocks, h = cur.horizon, f = cur.fixed, c = cur.cell, kWh = P.blockKWh * n;
+  const sel = CUSTOMERS.find(x => Math.abs(x.set.dcRate - P.dcRate) < 0.01 && x.set.nBlocks === n);
+  const fail = P.faultPPM > 0, k5 = 60;
+  const r10 = ppm => 1 - Math.pow(1 - ppm * 1e-6, P.N * 10);
+  const ppmShown = fail ? P.faultPPM : 100;
+  const retF = cur.fixed.p50 ? cur.fixed.p50[k5] : NaN, retC = cur.cell.p50 ? cur.cell.p50[k5] : NaN;
+  const lifeF = f.life, lifeC = c.life, cycF = lifeF * P.cpy, cycC = lifeC * P.cpy;
+  const avoidKWh = kWh * P.horizon * (1 / Math.max(lifeF, 0.1) - 1 / Math.max(lifeC, 0.1));
+  const co2 = (h.cell.mwh - h.fixed.mwh) * n * P.gridCO2 * 0.000453592 + avoidKWh * P.embodiedCO2 / 1000;
+  const rteC = P.rte * P.eff / 100;
+  const box = (lab, val, sub) => `<div class="big"><div class="lab">${lab}</div><div class="val">${val}</div><div class="sub">${sub}</div></div>`;
+  $("cview").innerHTML = `
+  <div class="card"><h2>What REON's cell-level control is worth to ${sel ? `a ${sel.name.toLowerCase()}` : "this site"}</h2>
+    <p class="cap">${n} × REON EBS (${n * 30} kW / ${kWh} kWh) behind the meter in Massachusetts, ${tariffName(P.dcRate)}, from ${P.startYear}. Compared with the same cells in a conventional battery whose weakest cell limits the whole string. Pick a customer:</p>
+    <div class="pick">${CUSTOMERS.map(x => `<button type="button" data-c="${x.id}" aria-pressed="${sel && sel.id === x.id}" title="${x.blurb}">${x.name}</button>`).join("")}
+      <button type="button" id="cvFail" aria-pressed="${fail && P.onFault === "retire"}" title="0.1% cell failures per year; a conventional block is replaced at its first cell failure">Include cell failures (REON's 2–3× case)</button></div>
+    <p class="fine">${sel ? sel.blurb + ". " : ""}${fail ? `Cell failures on: ${P.faultPPM} ppm per cell-year, conventional block ${P.onFault === "retire" ? "replaced at its first failure" : "repaired (outage and visit)"}.` : "No sudden cell failures (aging only)."}</p></div>
+  <div class="row">
+    ${box(`Extra value over ${P.horizon} years`, money(h.dNPV * n), `net present value, P10 ${money(h.dNPVp10 * n)} to P90 ${money(h.dNPVp90 * n)}; after REON's +${P.bmsOverhead}% BMS cost`)}
+    ${box("System cycle life", `${lifeC.toFixed(1)} y`, `vs ${lifeF.toFixed(1)} y conventional (+${(100 * (lifeC / lifeF - 1)).toFixed(0)}%) · about ${Math.round(cycC).toLocaleString()} vs ${Math.round(cycF).toLocaleString()} cycles`)}
+    ${box("Energy delivered per battery", `+${(100 * (c.mwh / f.mwh - 1)).toFixed(0)}%`, `${(c.mwh * n).toFixed(0)} vs ${(f.mwh * n).toFixed(0)} MWh over each battery's life`)}
+    ${box(`Batteries worn out over ${P.horizon} years`, (n * P.horizon / Math.max(lifeC, 0.1)).toFixed(1), `vs ${(n * P.horizon / Math.max(lifeF, 0.1)).toFixed(1)} conventional (block-lifetimes used up)`)}
+  </div>
+  <div class="row">
+    ${box("Usable capacity at year 5", isFinite(retC) ? `${(100 * retC).toFixed(0)}%` : "–", `vs ${isFinite(retF) ? (100 * retF).toFixed(0) : "–"}% conventional: every cell discharges to its own limit, not the weakest one's`)}
+    ${box("Round-trip efficiency", `${rteC.toFixed(1)}%`, `vs ${P.rte.toFixed(1)}% conventional (assumed; REON's per-cell switches cost ${(100 - P.eff).toFixed(1)}%)`)}
+    ${box("Payback", `${h.cell.payback >= 98 ? "n/a" : h.cell.payback.toFixed(1) + " y"}`, `vs ${h.fixed.payback >= 98 ? "n/a" : h.fixed.payback.toFixed(1) + " y"} conventional, after the 30% ITC`)}
+    ${box("Chance one cell stops the battery", `${(100 * r10(ppmShown)).toFixed(0)}% → ~0%`, `over 10 years at ${ppmShown} ppm cell failures (${P.N} cells in series); REON keeps ${P.k} backup cells`)}
+  </div>
+  <div class="row">
+    ${box("CO₂ avoided", `${co2.toFixed(1)} t`, `over ${P.horizon} years: extra clean energy delivered (ISO-NE average grid) plus batteries not manufactured`)}
+    ${box("Cells kept out of waste", `${(avoidKWh * P.cellKgPerKWh).toFixed(0)} kg`, `${avoidKWh.toFixed(0)} kWh of replacement batteries not built`)}
+    ${box(`${P.horizon}-year value, conventional`, money(h.fixed.npv * n), "present value of bill savings and program payments, minus purchases and O&amp;M")}
+    ${box(`${P.horizon}-year value, REON`, money(h.cell.npv * n), "same, with cell-level control")}
+  </div>
+  <div class="card why"><h2>Why it pays</h2>
+    <p>In a conventional battery every cell is wired in one line, so <b>the weakest cell decides how much energy the whole battery can give and when it must be replaced</b>, and <b>one failed cell stops all ${P.N}</b>. REON senses and switches each cell, so a cell that is empty steps aside while the others keep going, and ${P.k} backup cells take over from any that fail.</p>
+    <p>For this customer that means more of the battery's energy is usable every day, the battery lasts longer before it needs replacing, and a single bad cell no longer means an outage. The money comes from Massachusetts demand-charge savings, ConnectedSolutions summer payments and Clean Peak certificates.</p>
+    <p class="fine">Model calibrated on real cell-to-cell aging data (Zhou et al., Nature Energy 2026); rates from Eversource's 2026 rate summary and Mass Save program materials; costs from NREL; failure rates are an assumed range. Open the Engineering view to change any assumption.</p></div>`;
+  $("cview").querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", () => setCustomer(CUSTOMERS.find(x => x.id === b.dataset.c))));
+  $("cvFail").addEventListener("click", () => { const on = !(P.faultPPM > 0 && P.onFault === "retire"); Object.assign(P, on ? { faultPPM: 1000, onFault: "retire" } : { faultPPM: 0, onFault: "repair" }); buildControls(); changed(); });
+}
 
 buildControls();
 setTimeout(() => { DEF = runAll(clone(DEFAULTS), DEFAULTS.packs, true); recompute(); }, 0);
