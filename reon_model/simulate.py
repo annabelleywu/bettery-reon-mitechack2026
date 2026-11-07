@@ -34,11 +34,12 @@ parameter remain assumptions for a sodium-ion C&I block (REON EBS: 30 kW / 60 kW
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 
 import numpy as np
 
-from .control import ControlPolicy
+from .control import ControlPolicy, RemainingLifeTracker
 from .monitoring import Monitor, MonitoringConfig
 
 FEATURES = ["temp_offset_C", "soh_gap", "resistance_gap"]
@@ -367,6 +368,8 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
     t_grid = np.arange(K) * dt
     slots = _CellSlots(P, N, aging, pack.cycles_per_year, rng)
     monitor = Monitor(monitoring, pack.steps_per_year, np.random.default_rng(seed + 10_007))
+    tracker = (RemainingLifeTracker((P, N), pack.steps_per_year)
+               if (mode == "bypass" and policy.rest_count > 0 and policy.rest_by == "remaining_life") else None)
     names = monitoring.feature_names()
     beta = hazard.beta
     k_max = pack.bypass_headroom if mode == "bypass" else 0
@@ -386,14 +389,31 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
         R = slots.resistance(Q)
         in_string = ~bypassed
         # --- what the BMS measures, and the controller's choices -------------
-        Xm = monitor.features(monitor.read(Q, slots.q0, R, slots.temp, passed), in_string)
+        meas = monitor.read(Q, slots.q0, R, slots.temp, passed)
+        Xm = monitor.features(meas, in_string)
+        cap_meas = meas["capacity"] if monitoring.capacity.enabled else meas["soh"]
+        if tracker is not None:
+            tracker.update(cap_meas)
         left = k_max - bypassed.sum(axis=1)
         iso = policy.isolate(Xm, names, in_string, left)
         bypassed |= iso
         isolated += iso.sum(axis=1)
         in_string = ~bypassed
         left = k_max - bypassed.sum(axis=1)
-        rested = policy.rest(Xm, names, in_string, left)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)       # no capacity signal measured
+            pack_health = np.nanmean(np.where(in_string, cap_meas, np.nan), axis=1)
+        pack_health = np.nan_to_num(pack_health, nan=1.0)
+        if policy.rest_by == "remaining_life":
+            if tracker is not None and np.isfinite(cap_meas).any():
+                life = tracker.life(cap_meas, in_string, pack.retirement_retention)
+                rested = policy.rest_by_life(life, in_string, left, pack_health)
+            else:
+                rested = np.zeros((P, N), dtype=bool)
+        else:
+            rested = policy.rest(Xm, names, in_string, left) & (pack_health > policy.rest_stop_health)[:, None]
+        if policy.rest_temp_C > 0 and monitoring.temperature.enabled:
+            rested |= policy.rest_hot(meas["temperature"], in_string & ~rested, left - rested.sum(axis=1))
         rested_steps += rested.sum(axis=1)
         discharging = in_string & ~rested
         headroom = (left - rested.sum(axis=1)) if policy.bypass_on_empty else np.zeros(P, dtype=int)
@@ -446,6 +466,8 @@ def simulate(mode: str, n_packs: int = 200, pack: PackConfig = PackConfig(),
         slots.advance(dt, passed * avail[:, k][:, None])
         slots.replace(swap, t + dt)
         monitor.reset_cells(swap)
+        if tracker is not None:
+            tracker.reset(swap)
         passed = np.where(swap, 0.0, passed)
 
     if pack.retention_basis == "bol":
