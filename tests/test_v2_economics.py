@@ -18,7 +18,7 @@ def test_one_year_hand_calculation():
     v = pack_value(_res(60.0, 1.0), pack, e, cell_level=False)
     E = 60.0 * e.ac_efficiency
     cs = 200 * min(30, E / 3)
-    dc = 12 * 33.95 * 0.75 * min(30, E / 2)
+    dc = 12 * 33.95 * e.dc_realization * min(30, E / 2)
     cps = 0.87 * 65 * E / 1000 * (365 - 45)
     loss = E / 1000 * 365 * (1 / 0.88 - 1) * 0.20 * 1000
     capex = 600 * pack.nameplate_kwh * 0.7

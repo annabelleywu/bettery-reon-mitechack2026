@@ -40,3 +40,28 @@ def test_visit_cost_lowers_npv():
     dear = pack_value(r["fixed"], PACK, EconConfig(visit_cost=1500.0), cell_level=False)
     assert np.all(dear["npv"] <= cheap["npv"] + 1e-9)
     assert dear["visit_cost"].sum() > 0
+
+
+def test_horizon_value_hand_calculation():
+    """One pack, constant 60 kWh for 10 years then retired: two blocks over 20 years, checked by hand."""
+    from types import SimpleNamespace
+    from reon_model.economics import horizon_value
+    pk = PackConfig(years=20, n_series=250, cell_ah=60000 / (250 * 3.1), bypass_headroom=25)
+    K = 240
+    res = SimpleNamespace(energy_kwh=np.full((1, K), 60.0), availability=np.ones((1, K)),
+                          retirement_year=np.array([10.0]), visits_by_step=np.zeros((1, K)))
+    ec = EconConfig(start_year=2027)
+    v = horizon_value(res, pk, ec, cell_level=False)
+    assert v["blocks"][0] == 2
+    # capex: block 1 in 2027 at 30% ITC; block 2 in 2037 at that year's cost factor and no ITC
+    c1 = 600 * 60 * 0.7
+    c2 = 600 * ec.cost_factor(2037) * 60 * 1.0 / 1.08 ** 10
+    assert np.isclose(v["capex_pv"][0], c1 + c2)
+    # yearly cash flow is the same every year; no salvage (second block ends exactly at the horizon)
+    e = 60 * 0.96
+    yearly = (200 * min(30, e / 3) + 12 * 33.95 * ec.dc_realization * min(30, e / 2)
+              - e / 1000 * 365 * (1 / 0.88 - 1) * 200 - 0.025 * 600 * 60)
+    cps = sum(0.87 * ec.acp(2027 + y) * e / 1000 * (365 - 45) / 1.08 ** (y + 1) for y in range(20))
+    annuity = sum(1 / 1.08 ** (y + 1) for y in range(20))
+    assert np.isclose(v["npv"][0], yearly * annuity + cps - (c1 + c2), rtol=1e-9)
+    assert v["salvage_pv"][0] == 0
