@@ -99,8 +99,9 @@ def site_value(results: dict, pack, econ: EconConfig = EconConfig()) -> dict:
     med = lambda x: float(np.median(x))
     d_npv = (c["npv"] - f["npv"]) * n
     d_mwh = (c["mwh_ac"] - f["mwh_ac"]) * n
-    life_f = float(np.median(np.where(np.isfinite(results["fixed"].retirement_year), results["fixed"].retirement_year, pack.years)))
-    life_c = float(np.median(np.where(np.isfinite(results["bypass"].retirement_year), results["bypass"].retirement_year, pack.years)))
+    # mean service life over packs: life is counted in whole steps, so a median moves a month at a time
+    life_f = float(np.mean(np.where(np.isfinite(results["fixed"].retirement_year), results["fixed"].retirement_year, pack.years)))
+    life_c = float(np.mean(np.where(np.isfinite(results["bypass"].retirement_year), results["bypass"].retirement_year, pack.years)))
     kwh = pack.nameplate_kwh * n
     avoided_kwh = kwh * econ.horizon_years * (1 / max(life_f, 0.1) - 1 / max(life_c, 0.1))
     summary = {

@@ -3,8 +3,12 @@
 Writes outputs/value_summary.md. Faults are off (the paper's data has no fault events);
 every case runs both designs on identical cells (common random numbers).
 
-    python scripts/run_value.py            # 300 packs
-    python scripts/run_value.py --packs 60 # quick check
+Energy and life gains are ratios of MEANS over the paired packs. Service life is counted in
+whole months, so a median ratio jumps by about a point when the median pack crosses a month;
+means converge about twice as fast (see docs/Methodology_v2.md, Section 10).
+
+    python scripts/run_value.py                         # headline 3000 packs, sweeps 1000
+    python scripts/run_value.py --packs 60 --headline 60  # quick check
 """
 from __future__ import annotations
 
@@ -22,6 +26,9 @@ from reon_model.economics import EconConfig, site_value  # noqa: E402
 from reon_model.simulate import AgingConfig, HazardConfig, PackConfig, compare  # noqa: E402
 
 CAL = pathlib.Path(__file__).resolve().parents[1] / "data" / "calibration_zhou2026.json"
+# REON EBS block: 30 kW / 60 kWh nominal. 96 cells x 3.1 V, so 201.6 Ah per cell gives exactly 60 kWh
+# (PackConfig's 200 Ah default gives 59.52 kWh; the web app uses 60 kWh).
+EBS = PackConfig(years=20, cell_ah=60000 / (96 * 3.1))
 OUT = pathlib.Path(__file__).resolve().parents[1] / "outputs" / "value_summary.md"
 
 TEAM_POLICY = ControlPolicy(rest_count=2, rest_by="remaining_life", rest_threshold=0.20, rest_stop_health=0.85)
@@ -29,7 +36,7 @@ BYPASS_ONLY = ControlPolicy()
 
 
 def run(packs, pack=None, aging=None, policy=TEAM_POLICY, econ=None, hazard=None, seed=0):
-    pack = pack or PackConfig(years=20)
+    pack = pack or EBS
     aging = aging or AgingConfig.from_calibration(CAL)
     econ = econ or EconConfig()
     r = compare(n_packs=packs, pack=pack, aging=aging, hazard=hazard or HazardConfig.off(), seed=seed, policy=policy)
@@ -38,9 +45,11 @@ def run(packs, pack=None, aging=None, policy=TEAM_POLICY, econ=None, hazard=None
     v = site_value(r, pack, econ)
     k5 = 5 * pack.steps_per_year
     return {
-        "energy_gain": 100 * (np.median(b.delivered_mwh) / np.median(f.delivered_mwh) - 1),
-        "life_gain": 100 * (np.median(life(b)) / np.median(life(f)) - 1),
-        "life_fixed": float(np.median(life(f))), "life_bypass": float(np.median(life(b))),
+        "energy_gain": 100 * (np.mean(b.delivered_mwh) / np.mean(f.delivered_mwh) - 1),
+        "life_gain": 100 * (np.mean(life(b)) / np.mean(life(f)) - 1),
+        "life_fixed": float(np.mean(life(f))), "life_bypass": float(np.mean(life(b))),
+        "life_gain_p10": float(np.percentile(life(b) - life(f), 10)),
+        "life_gain_p90": float(np.percentile(life(b) - life(f), 90)),
         "kw5_fixed": float(np.median(f.firm_kw[:, k5])), "kw5_bypass": float(np.median(b.firm_kw[:, k5])),
         "bpow0": float(np.nanmedian(f.beta_power[:, 0])),
         "value": v,
@@ -56,15 +65,16 @@ def fmt_case(name, x):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--packs", type=int, default=300)
+    ap.add_argument("--packs", type=int, default=1000, help="packs per design for the sweep cases")
+    ap.add_argument("--headline", type=int, default=3000, help="packs per design for the team default")
     args = ap.parse_args()
-    P = args.packs
+    P, H = args.packs, args.headline
     t0 = time.time()
     cal = AgingConfig.from_calibration(CAL)
-    pk = PackConfig(years=20)
+    pk = EBS
     cases = []
 
-    base = run(P)
+    base = run(H)
     cases.append(("**Team default**: bypass on empty + rest before knee, k = 4", base))
     cases.append(("Bypass on empty only, k = 4", run(P, policy=BYPASS_ONLY)))
     for k in (0, 2, 8, 16, 32, 95):
@@ -88,10 +98,14 @@ def main():
     lines = [
         "# Value of cell-level control: Massachusetts C&I site",
         "",
-        f"2 x REON EBS (60 kW / 120 kWh nominal), Eversource Greater Boston G-2, from 2027. {P} packs per design, "
-        "identical cells in both designs, sudden faults off. Inputs and sources: `docs/Methodology_v2.md`, `reon_model/economics.py`.",
+        f"2 x REON EBS (60 kW / 120 kWh nominal), Eversource Greater Boston G-2, from 2027. Team default: {H} packs "
+        f"per design; other cases: {P}. Identical cells in both designs, sudden faults off. Inputs and sources: "
+        "`docs/Methodology_v2.md`, `reon_model/economics.py`.",
         "",
-        "## Team default, per site (medians)",
+        "Energy and life: means over packs. Dollars: medians over packs; NPV gain is the median of each pack's "
+        "paired difference.",
+        "",
+        "## Team default, per site",
         "",
         "| | Fixed string | Cell-level control |",
         "|---|---|---|",
@@ -104,9 +118,11 @@ def main():
         f"| Simple payback | {f['payback']:.2f} y | {b['payback']:.2f} y |",
         f"| NPV over service life | ${f['npv']:,.0f} | ${b['npv']:,.0f} |",
         f"| Energy delivered (AC) | {f['mwh_ac']:.0f} MWh | {b['mwh_ac']:.0f} MWh |",
-        f"| Service life | {env['life_fixed']:.2f} y | {env['life_bypass']:.2f} y |",
+        f"| Service life (mean) | {env['life_fixed']:.2f} y | {env['life_bypass']:.2f} y |",
         f"| Firm kW for 2 h at year 5 (per block) | {base['kw5_fixed']:.1f} | {base['kw5_bypass']:.1f} |",
         "",
+        f"Lifetime energy gain **{base['energy_gain']:+.1f}%**, service life gain **{base['life_gain']:+.1f}%** "
+        f"(per pack: P10 {base['life_gain_p10']:+.2f} y, P90 {base['life_gain_p90']:+.2f} y). "
         f"NPV gain from cell-level control: **${v['delta']['npv_p50']:,.0f}** per site "
         f"(P10 ${v['delta']['npv_p10']:,.0f}, P90 ${v['delta']['npv_p90']:,.0f}). "
         f"Extra energy {v['delta']['mwh_ac']:.1f} MWh. CO2 avoided: {env['co2_operation_t']:.1f} t (operation) + "

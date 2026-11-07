@@ -537,7 +537,10 @@ function runAll(p, packs, withBands) {
   for (const mode of ["fixed", "cell"]) {
     const r = []; for (let pk = 0; pk < packs; pk++) r.push(simPack(p, mode, pk, pk === 0));
     res[mode] = r;
-    const o = { life: pct(r.map(x => x.life), 0.5), mwh: pct(r.map(x => x.mwh), 0.5), visits: pct(r.map(x => x.visits), 0.5),
+    // gains use means over the paired packs: life is counted in whole months, so a median jumps by a
+    // month at a time; means converge about twice as fast (Methodology v2, Section 10)
+    const o = { life: r.reduce((s, x) => s + x.life, 0) / packs, mwh: r.reduce((s, x) => s + x.mwh, 0) / packs,
+      lifeMed: pct(r.map(x => x.life), 0.5), mwhMed: pct(r.map(x => x.mwh), 0.5), visits: pct(r.map(x => x.visits), 0.5),
       avail: r.reduce((s, x) => s + x.avail, 0) / packs, iso: r.reduce((s, x) => s + x.nIso, 0) / packs,
       rest: r.reduce((s, x) => s + x.restSteps, 0) / packs, tr: r[0].tr,
       kw: F64(K), bp: F64(K) };
@@ -643,7 +646,7 @@ const GROUPS = [
     { id: "repairDays", label: "Outage per service visit", min: 0, max: 60, step: 1, fmt: v => `${v} days`, needs: "faults" },
   ] },
   { id: "run", title: "Simulation", tag: "", open: false, items: [
-    { id: "packs", label: "Simulated packs (more is smoother, slower)", min: 8, max: 160, step: 8, fmt: v => `${v}`, note: "The browser default (48) is noisy by ±1–2 points. Slide numbers come from the Python model at 300+ packs, which this matches at equal settings." },
+    { id: "packs", label: "Simulated packs (more is smoother, slower)", min: 8, max: 160, step: 8, fmt: v => `${v}`, note: "Gains are means over paired packs. The first 48 packs read about 1 point high on energy and life; at 2,000 packs the browser gives +6.8% energy, +8.2% life, +$3.5k per site. Slide numbers (Python, 3,000 packs): +6.5%, +8.0%, +$3.0k. Bypass alone agrees within 0.2 points; the resting gap comes from how each version estimates capacity (the browser fuses all signals)." },
   ] },
 ];
 const SIGNALS = [
@@ -744,8 +747,8 @@ function renderKPIs(cur, def, k) {
   const dGainE = gainE - 100 * (dc.mwh / df.mwh - 1);
   const yr = (k * DT).toFixed(1);
   const items = [
-    { lab: "Service life (years)", f: life(f.life), c: life(c.life), d: `${fmtD(c.life - f.life, " y", 2)} vs fixed (${gainL >= 0 ? "+" : ""}${gainL.toFixed(1)}%)`, dd: fmtD(c.life - dc.life, " y vs defaults", 2) },
-    { lab: "Lifetime energy (MWh)", f: f.mwh.toFixed(0), c: c.mwh.toFixed(0), d: `${fmtD(gainE, "%", 1)} vs fixed`, dd: `${fmtD(dGainE, " pts of gain vs defaults", 1)}` },
+    { lab: "Service life (years, mean over packs)", f: life(f.life), c: life(c.life), d: `${fmtD(c.life - f.life, " y", 2)} vs fixed (${gainL >= 0 ? "+" : ""}${gainL.toFixed(1)}%)`, dd: fmtD(c.life - dc.life, " y vs defaults", 2) },
+    { lab: "Lifetime energy (MWh, mean over packs)", f: f.mwh.toFixed(0), c: c.mwh.toFixed(0), d: `${fmtD(gainE, "%", 1)} vs fixed`, dd: `${fmtD(dGainE, " pts of gain vs defaults", 1)}` },
     { lab: `Firm kW for ${P.duration} h, year ${yr}`, f: f.kw[k].toFixed(1), c: c.kw[k].toFixed(1), d: `${fmtD(c.kw[k] - f.kw[k], " kW vs fixed", 1)}`, dd: `<span class="zero">min(rating, usable kWh ÷ ${P.duration} h); 0 once retired</span>` },
     { lab: `Power utilisation βpower, year ${yr}`, f: isFinite(f.bp[k]) ? f.bp[k].toFixed(3) : "–", c: isFinite(c.bp[k]) ? c.bp[k].toFixed(3) : "–", d: fmtD(c.bp[k] - f.bp[k], " vs fixed", 3), dd: `<span class="zero">paper fleet: 0.871 cars, 0.849 buses</span>` },
   ];
@@ -877,11 +880,12 @@ function renderTime() {
   const err = CUR.cell.tr.estErr[k];
   const eo = $("estOut"); if (eo) eo.textContent = isFinite(err) ? `In year ${(k * DT).toFixed(1)} the controller knows each cell's capacity to ±${(100 * err).toFixed(2)} points (RMS).` : "";
 }
-// Paired gain (same initial cells) of a variant over the fixed string, medians over packs.
+// Paired gain (same initial cells) of a variant over the fixed string, means over packs.
 function pairedGain(q, packs) {
   const f = [], c = [], fl = [], cl = [];
   for (let pk = 0; pk < packs; pk++) { const a = simPack(q, "fixed", pk, false), b = simPack(q, "cell", pk, false); f.push(a.mwh); c.push(b.mwh); fl.push(a.life); cl.push(b.life); }
-  return { gain: 100 * (pct(c, 0.5) / pct(f, 0.5) - 1), life: 100 * (pct(cl, 0.5) / pct(fl, 0.5) - 1) };
+  const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+  return { gain: 100 * (mean(c) / mean(f) - 1), life: 100 * (mean(cl) / mean(fl) - 1) };
 }
 function runSweeps(token) {
   const packs = Math.min(32, P.packs);
