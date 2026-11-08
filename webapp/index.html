@@ -1032,6 +1032,13 @@ const CUSTOMERS = [
   .cmp td.v.win{color:var(--cell);font-weight:600}.cmp td.v.win::after{content:" ✓";color:var(--accent)}.cmp td.d{font-family:var(--font-data);white-space:nowrap;width:14%;color:var(--muted)}.cmp td.d.pos{color:var(--good)}.cmp td.d.neg{color:var(--fault)}
   .cmp td.c{width:34%}.cmp td.c .src{font-size:11px;color:var(--muted);margin-top:3px}.cmp td.c .src a{color:var(--cell)}.cmp tr.grp td{background:var(--cell-soft);font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:7px 12px;border-bottom:0}
   .cmpwrap{overflow-x:auto}
+  #tip{position:fixed;z-index:9999;display:none;max-width:min(400px,calc(100vw - 16px));background:#0a1a11;color:#f5f7f3;padding:11px 14px;border-radius:12px;font-size:14px;line-height:1.5;box-shadow:0 8px 28px rgba(0,0,0,.28);border:1px solid rgba(245,247,243,.3);pointer-events:none;font-family:var(--font-ui)}
+  .cv .info{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;border:1.5px solid var(--cell);color:var(--cell);font-size:12px;font-weight:700;line-height:1;cursor:help;vertical-align:1px;margin-left:4px}
+  .cv .info:hover,.cv .info:focus-visible{background:var(--cell);color:var(--bg);outline:none}.verdict .info{border-color:rgba(245,247,243,.6);color:#f5f7f3}.verdict .info:hover{background:#f5f7f3;color:#0a1a11}
+  .setup{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;font-size:14.5px;color:var(--muted)}.setup b{color:var(--ink);font-weight:600;margin-right:4px}
+  .setup span.pill{background:var(--cell-soft);color:var(--ink);border-radius:999px;padding:5px 13px;font-size:14.5px}.setup span.pill i{font-style:normal;color:var(--muted)}
+  .trade{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin:10px 0 6px}.trade .tl{font-size:13.5px;color:var(--muted)}.trade .tv{font-size:34px;font-weight:300;letter-spacing:-.02em;color:var(--cell)}.trade .tv.cost{color:var(--ink)}.trade .arr{font-size:28px;color:var(--muted)}.trade .tn{font-size:13px;color:var(--muted);line-height:1.4}
+  .trade-bars{margin:12px 0 4px}.trade-bars .tb{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;align-items:center;margin:6px 0;font-size:13.5px;color:var(--muted)}.trade-bars .tb i{display:block;height:14px;border-radius:7px}
   .cv{font-size:16px}.cv .card .cap,.cv .card p{font-size:15px;line-height:1.5}.cv .fine{font-size:13.5px}.cv .why p{font-size:16px;line-height:1.6}
   .cv .card h2{font-size:21px;font-weight:500;margin-bottom:6px}
   .story div{font-size:15.5px}.story b{font-size:16px}
@@ -1063,6 +1070,7 @@ const CUSTOMERS = [
   const g = document.createElement("div"); g.className = "card guide";
   g.innerHTML = `<b>How to read this view.</b> Every assumption is a slider on the left (grouped, with its source or status in grey). The four tiles compare a conventional string (grey, left number) with REON's cell-level control (green, right number). Below: the value table for the owner, a ring per design where each spoke is one cell (press Play to watch them age), usable energy over the battery's life, and three sweeps showing how the gain depends on backup cells, cell-to-cell spread and resting. Red dashed lines mark break-even against REON's extra BMS cost.`;
   main.insertBefore(g, main.firstChild);
+  const eh = document.createElement("div"); eh.id = "engHead"; eh.className = "card guide"; main.insertBefore(eh, g.nextSibling);
   const es = document.createElement("div"); es.id = "engSrc"; main.appendChild(es);
   const grid = document.querySelector(".grid"), tabs = document.createElement("div"); tabs.className = "tabs"; tabs.setAttribute("role", "tablist");
   const mk = (id, label) => { const b = document.createElement("button"); b.type = "button"; b.id = id; b.textContent = label; b.setAttribute("role", "tab"); return b; };
@@ -1132,7 +1140,7 @@ function renderCustomer(cur) {
   const avoidKWh = kWh * P.horizon * (1 / Math.max(lifeF, 0.1) - 1 / Math.max(lifeC, 0.1));
   const co2 = (h.cell.mwh - h.fixed.mwh) * n * P.gridCO2 * 0.000453592 + avoidKWh * P.embodiedCO2 / 1000;
   const rteC = P.rte * P.eff / 100;
-  const info = how => how ? ` <span class="info" tabindex="0" role="note" aria-label="${how.replace(/"/g, "&quot;")}" title="${how.replace(/"/g, "&quot;")}">ⓘ</span>` : "";
+  const info = how => how ? ` <span class="info" tabindex="0" role="note" aria-label="${how.replace(/"/g, "&quot;")}" data-tip="${how.replace(/"/g, "&quot;")}">ⓘ</span>` : "";
   // one comparison row: criterion | conventional | REON | difference. better: "hi" (higher wins), "lo" (lower wins) or "" (no winner)
   const row = (lab, how, ids, vf, vc, subF, subC, diff, better, dsign) => {
     const wf = better === "hi" ? vf.n > vc.n : better === "lo" ? vf.n < vc.n : false, wc = better === "hi" ? vc.n > vf.n : better === "lo" ? vc.n < vf.n : false;
@@ -1223,6 +1231,7 @@ function renderCustomer(cur) {
     <div><b>2 · What REON changes</b>REON senses and switches every cell. An empty cell steps aside while the rest keep going, and ${P.k} backup cells take over from any that fail.</div>
     <div><b>3 · What it is worth</b>More usable energy, a longer-lasting battery and no single-cell outages, turned into dollars and CO₂ for a real Massachusetts customer below.</div>
   </div>
+  <div class="setup"><b>How we sized one REON block</b><span class="pill">${P.N} cells in a string <i>(REON: 200–300)</i></span><span class="pill">${P.k} backup cells, ${Math.round(100 * P.k / P.N)}% <i>(REON's design)</i></span><span class="pill">${P.blockKWh} kWh · ${P.ratedKW} kW</span><span>Our picks inside REON's ranges, to be confirmed with REON.</span></div>
   <div class="card"><h2>What REON's cell-level control is worth to ${sel ? `a ${sel.name.toLowerCase()}` : "this site"}</h2>
     <p class="cap">${n} × REON EBS (${n * 30} kW / ${kWh} kWh) behind the meter in Massachusetts, ${tariffName(P.dcRate)}, from ${P.startYear}. Compared with the same cells in a conventional battery whose weakest cell limits the whole string. Pick a customer:</p>
     <div class="pick">${CUSTOMERS.map(x => `<button type="button" data-c="${x.id}" aria-pressed="${sel && sel.id === x.id}" title="${x.blurb}">${x.name}</button>`).join("")}</div>
@@ -1237,7 +1246,7 @@ function renderCustomer(cur) {
       <div class="head">${win ? `REON comes out <b>${gain} ahead</b> over ${P.horizon} years.` : `A conventional battery comes out <b>${gain} ahead</b> at these assumptions.`}</div>
       <div class="s">Net present value, REON minus conventional, for ${n} × 60 kWh blocks after REON's assumed +${P.bmsOverhead}% BMS cost. In 80% of simulated batteries the difference is between ${money(h.dNPVp10 * n)} and ${money(h.dNPVp90 * n)}.${info("Each design is simulated with the same cells; the difference is averaged over " + P.packs + " batteries. Open the Engineering view to change any assumption.")}</div></div>
     <div><div class="k">What decides it</div><ul>
-      <li>REON pays off for this customer if its price premium is under <b>${beP.toFixed(0)}%</b> of system cost (assumed ${P.bmsOverhead}%).${info("Break-even premium: the extra price at which REON's net value equals the conventional battery's. Purchase and replacement costs scale with the premium; everything else is unchanged.")}</li>
+      <li>You pay about <b>${money(Math.max(upC - upF, 0))} more up front</b> (after the 30% tax credit) for REON's cell-level control, and come out ahead by ${money(Math.abs(h.dNPV * n))} over ${P.horizon} years once replacements and running costs are counted.${info("Extra upfront cost = installed cost × " + P.bmsOverhead + "% for REON's cell-level BMS (REON: about 3× a conventional BMS, 2–3% of system cost), less the 30% tax credit. The 20-year net value already includes this extra cost and the cost of replacement batteries.")}</li>
       <li>Battery life <b>${lifeF.toFixed(1)} → ${lifeC.toFixed(1)} y</b>, energy delivered <b>+${(100 * (c.mwh / f.mwh - 1)).toFixed(0)}%</b>, ${fail ? `and no outage from a single failed cell (conventional: <b>${(100 * failF).toFixed(0)}%</b> chance in 10 years)` : `and single-cell failures are covered by ${P.k} backup cells (choose “Cell failures included” above to price them in)`}.</li>
       <li>Assumes REON's per-cell switches cost ${(100 - P.eff).toFixed(1)}% of round-trip energy (about ${(0.5 * (100 - P.eff) / 1.6).toFixed(2)} mΩ per switch at 100 A). At 1 mΩ (3.2%) the gain turns negative, so this is the number to confirm with REON.</li>
     </ul></div>
@@ -1246,12 +1255,11 @@ function renderCustomer(cur) {
   <div class="duo">
     <div class="card"><h2>How long each battery stays useful</h2>
       <p class="cap">Usable energy as a share of rated energy. Each line ends when that battery has to be replaced${fail ? " (here, when its first cell fails)" : ""}. Median over ${P.packs} simulated batteries.</p>${retSvg}</div>
-    <div class="card be"><h2>How much more could REON cost?</h2>
-      <p class="cap">The highest extra price over a conventional battery at which REON still pays off for this customer.</p>
-      <div class="big2">${beP > 0 ? `up to +${beP.toFixed(0)}%` : "no premium"}</div>
-      <div class="track"><i class="fill ${beP >= P.bmsOverhead ? "" : "bad"}" style="width:${bx(beP)}%"></i><b class="mk" style="left:${bx(P.bmsOverhead)}%"><span${bx(P.bmsOverhead) < 20 ? ' style="left:-2px;transform:none"' : ""}>we assume +${P.bmsOverhead}%</span></b></div>
-      <div class="ticks"><span>0%</span><span>break-even +${Math.max(beP, 0).toFixed(0)}%</span></div>
-      <p class="fine" style="margin-top:12px">REON says its cell-level BMS costs about 3× a conventional one (2–3% of system cost), so we assume +${P.bmsOverhead}%. The real price is REON's to set.</p></div>
+    <div class="card be"><h2>The trade: pay a little more now, come out ahead</h2>
+      <p class="cap">What REON's cell-level control adds to the price, and what you get for it.</p>
+      <div class="trade"><div><div class="tl">Extra you pay up front</div><div class="tv cost">+${money(Math.max(upC - upF, 0))}</div><div class="tn">after the 30% tax credit</div></div><div class="arr">→</div><div><div class="tl">Ahead after ${P.horizon} years</div><div class="tv">${h.dNPV >= 0 ? "+" : "−"}${money(Math.abs(h.dNPV * n))}</div><div class="tn">net, after that extra cost and replacements</div></div></div>
+      <div class="trade-bars"><div class="tb"><span>Extra cost</span><i style="width:${(100 * Math.max(upC - upF, 0) / Math.max(upC - upF, Math.abs(h.dNPV * n), 1)).toFixed(1)}%;background:var(--fixed)"></i></div><div class="tb"><span>Net gain</span><i style="width:${(100 * Math.abs(h.dNPV * n) / Math.max(upC - upF, Math.abs(h.dNPV * n), 1)).toFixed(1)}%;background:${h.dNPV >= 0 ? "var(--cell)" : "var(--fault)"}"></i></div></div>
+      <p class="fine" style="margin-top:12px">${upC > upF && h.dNPV > 0 ? `For every extra $1 you pay up front, about <b>${(h.dNPV * n / (upC - upF)).toFixed(h.dNPV * n / (upC - upF) >= 10 ? 0 : 1) === "" ? "" : "$" + (h.dNPV * n / (upC - upF)).toFixed(h.dNPV * n / (upC - upF) >= 10 ? 0 : 1)}</b> comes back as net gain over ${P.horizon} years.` : "At these assumptions the extra upfront cost is not recovered."}</p></div>
   </div>
   <div class="card"><h2>Side by side: conventional battery vs REON cell-level control</h2>
     <p class="cap">Same cells, same site, same tariff. ✓ marks the better option on each line; hover ⓘ for how it is calculated, and follow the source links.</p>
@@ -1263,9 +1271,27 @@ function renderCustomer(cur) {
     <p class="fine">Model calibrated on real cell-to-cell aging data (Zhou et al., Nature Energy 2026); rates from Eversource's 2026 rate summary and Mass Save program materials; costs from NLR (formerly NREL); failure rates are an assumed range. Open the Engineering view to change any assumption.</p></div>
   ${sourcesCard()}`;
   const es = document.getElementById("engSrc"); if (es) es.innerHTML = sourcesCard();
+  const eh = document.getElementById("engHead"); if (eh) eh.innerHTML = `<b>Price headroom (for REON's pricing; not shown to customers).</b> At this site and scenario, REON's cell-level control still pays off if it costs up to <b>+${Math.max(beP, 0).toFixed(0)}%</b> more than a conventional battery; we assume +${P.bmsOverhead}%. It is the price at which the 20-year net value of the two designs is equal, so it depends on every assumption on this page, including the failure scenario.`;
   $("cview").querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", () => setCustomer(CUSTOMERS.find(x => x.id === b.dataset.c))));
   $("cview").querySelectorAll("[data-sc]").forEach(b => b.addEventListener("click", () => { const on = b.dataset.sc === "fail"; Object.assign(P, on ? { faultPPM: 1000, onFault: "retire" } : { faultPPM: 0, onFault: "repair" }); buildControls(); changed(); }));
 }
+
+(function () {
+  const tip = document.createElement("div"); tip.id = "tip"; tip.setAttribute("role", "tooltip"); document.body.appendChild(tip);
+  let cur = null;
+  const show = el => { cur = el; tip.textContent = el.getAttribute("data-tip"); tip.style.display = "block";
+    const r = el.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = Math.min(Math.max(8, r.left + r.width / 2 - tw / 2), innerWidth - tw - 8), yy = r.bottom + 8; if (yy + th > innerHeight - 8) yy = Math.max(8, r.top - th - 8);
+    tip.style.left = x + "px"; tip.style.top = yy + "px"; };
+  const hide = () => { cur = null; tip.style.display = "none"; };
+  const hit = e => e.target.closest && e.target.closest(".info[data-tip]");
+  document.addEventListener("mouseover", e => { const t = hit(e); if (t) show(t); });
+  document.addEventListener("mouseout", e => { if (hit(e)) hide(); });
+  document.addEventListener("focusin", e => { const t = hit(e); if (t) show(t); });
+  document.addEventListener("focusout", e => { if (hit(e)) hide(); });
+  document.addEventListener("click", e => { const t = hit(e); if (t) { cur === t ? hide() : show(t); } else hide(); });
+  window.addEventListener("scroll", hide, { passive: true });
+})();
 
 buildControls();
 setTimeout(() => { DEF = runAll(clone(DEFAULTS), DEFAULTS.packs, true); recompute(); }, 0);

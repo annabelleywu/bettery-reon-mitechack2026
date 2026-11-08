@@ -39,15 +39,15 @@ The **Customer view** opens with these three panels:
 - **Cell failures included (upside case):** also assumes 1 in 1,000 cells fails each year (an assumption; no public data) and a conventional battery is replaced whenever one cell fails. In this scenario our model gives REON roughly 2× the energy and life, in the range of the 2–3× REON states. We do not know how REON measured theirs, so this is an upside scenario, not a replication. The recommendation panel shows a "Base case" or "Cell failures included" tag so it is always clear which one you are looking at.
 
 **The recommendation panel** (dark green) answers the customer's question in one line: which option comes out ahead over 20 years, and by how much (with the range across simulated batteries). Beside it, **What decides it** lists:
-- **Break-even price premium.** The highest extra price REON's system can carry and still pay off for this customer (about 9% for the default site, against 4% assumed). This is also a pricing guide for REON.
+- **The trade.** What REON's cell-level control adds to the upfront price after the tax credit (about $2,000 for the default site) against how far ahead the customer is after 20 years once that extra cost and replacements are counted. The "The trade" card below shows it as two numbers and two bars.
 - **The physical gains.** Battery life, energy delivered and single-cell failure protection.
 - **The main risk.** Per-cell switch losses: at 1 mΩ per switch the gain turns negative, so this is the number to confirm with REON.
 
 **Six at-a-glance tiles.** Paired bars for net value, battery life, energy delivered, payback, batteries bought and the chance one cell stops the battery; green text marks where REON is better, red where it is not.
 
-**Two charts.** A line chart of usable energy over time (each line ends when that battery is replaced) and a bar showing how much more REON could cost and still pay off.
+**Two cards.** A line chart of usable energy over time (each line ends when that battery is replaced) and "The trade": the extra upfront cost against the net gain. A **How we sized one REON block** line near the top says where 250 cells, 25 backups and 60 kWh come from (our picks inside REON's stated ranges, to be confirmed with REON). The price REON could charge and still pay off ("price headroom") is in the Engineering view, since it is a pricing question for REON, not for the customer.
 
-**Side-by-side table.** One column for a conventional battery and one for REON with the same cells, site and tariff, plus a difference column. A ✓ marks the better option on each line. Hover over **ⓘ** to see how a line is calculated; the links under each line go to its sources.
+**Side-by-side table.** One column for a conventional battery and one for REON with the same cells, site and tariff, plus a difference column. A ✓ marks the better option on each line. Hover over (or tap) **ⓘ** to see how a line is calculated; the links under each line go to its sources.
 
 | Group | Lines |
 |---|---|
@@ -77,7 +77,7 @@ A short "How to read this view" note sits at the top. Then:
 1. Customer view, default site: about +12% energy and +11% life per battery, about +$4k per site over 20 years.
 2. Click **Cold-storage warehouse**: ten blocks, about five times the value.
 3. Choose **Cell failures included**: the conventional battery's life roughly halves and REON's value jumps (in the range of REON's stated 2–3×; we do not claim to replicate their figure).
-4. Read the recommendation panel: the break-even price premium shows how much more REON can charge and still pay off.
+4. Read the recommendation panel and the "The trade" card: a small extra upfront cost against the net gain after 20 years.
 5. Engineering view → move **Backup cells k** from 25 to 5, then to 125, and watch the gain shrink and grow.
 6. Move **Cell-to-cell spread, multiple of the calibrated spread** (under Cell aging) to 2×: more uneven cells make REON worth more.
 
