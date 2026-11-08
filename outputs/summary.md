@@ -1,3 +1,5 @@
+> **v1 demo output** (`scripts/run_demo.py`): 96-cell block, 4 backups, placeholder fault hazard. It documents the learned fault-intensity model. Current results: [`value_summary.md`](value_summary.md).
+
 # REON fault-intensity model and value demo
 
 Cell-aging spread is calibrated on Zhou et al. (2026) per-cell data (`outputs/calibration_report.md`). The stationary timeline, pack design and every fault-hazard number are placeholder assumptions (`reon_model/simulate.py`).

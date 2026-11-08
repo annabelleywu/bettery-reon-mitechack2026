@@ -1,22 +1,38 @@
 # Beyond the Weakest Cell: REON cell-level control value model
 
-MIT Energy & Climate Hack 2026, REON challenge. This repo estimates what per-cell bypass is worth compared with a conventional fixed series string. It combines
+MIT Energy & Climate Hack 2026, REON challenge. Team: Isabell Luo (MIT), Annabelle Wu (Harvard), Miya Cao (Stanford), David Gardner (BU).
 
-1. a **learned fault model**: each cell's hard-fault process is a **non-homogeneous Poisson process (NHPP)** whose intensity is predicted from telemetry REON already measures, and
-2. a **Monte Carlo aging simulator**: cell-to-cell capacity drift with knee onset, **calibrated on the per-cell field data of Zhou et al. (2026)**, plus those faults, for both architectures on identical cells.
+**Question.** For a Massachusetts commercial customer with a REON EBS battery (sodium-ion, 30 kW / 60 kWh per block, 250 cells per string with about 10% backup cells), how much more energy, life, reliability, money and CO₂ does per-cell sensing and bypass deliver than the same cells in a conventional series string, where the weakest cell limits everything and one failed cell stops the whole battery?
+
+**Answer (v4, Python reference, 2,000 paired packs; full tables in [`outputs/value_summary.md`](outputs/value_summary.md)):**
+
+| Per two-block site (60 kW / 120 kWh), Eversource G-2 | Result |
+|---|---|
+| Lifetime energy and service life per battery | **+12.1% energy, +10.6% life** |
+| 20-year value gain (replacements at NREL-projected prices, NREL O&M, REON's +4% BMS cost, 50% demand-charge capture) | **+$4.3k** (P10 +$2.0k, P90 +$6.7k) |
+| With 0.1% cell failures per year and conventional blocks replaced at their first failure (REON's own 2–3× comparison) | **2.3× the energy and life, +$87k** |
+| Customers: neighborhood grocer (G-1 demand option) / cold-storage warehouse (G-3, 10 blocks) | +$4.7k / +$20.7k |
+| Per 100 MW of C&I storage | +$7.2M, +19 GWh, 9.5 kt CO₂ avoided, 368 t of cells not made over 20 years |
+
+**Where to read more:**
+- [`docs/Methodology_v2.md`](docs/Methodology_v2.md): the full method, every assumption with its source, validation, results, sensitivities and limitations.
+- [`docs/Reliability_and_Customers_Research.md`](docs/Reliability_and_Customers_Research.md): REON CTO notes, cell failure rates, Massachusetts outage costs and rates, customers.
+- [`docs/MA_Economics_Research.md`](docs/MA_Economics_Research.md): the Massachusetts market, policy and revenue research (42 sources).
+- **Dashboard**: [`webapp/index.html`](webapp/index.html) (open in a browser, no build), also published at https://claude.ai/artifact/2uKjEAMjq2JzoyPa3ejHJd. A **Customer view** (value, cycle life, usable capacity, round-trip efficiency, payback, reliability, CO₂, with customer presets) and an **Engineering view** (every assumption as a slider, per-cell rings over time, sweeps).
 
 ```bash
 pip install -r requirements.txt
 ./scripts/fetch_paper_data.sh   # optional: paper source data (MIT licence) into data/paper/
 python scripts/calibrate.py     # optional: refit data/calibration_zhou2026.json, validation report
-python -m pytest -q             # 41 tests (2 need the paper data)
-python scripts/run_demo.py      # writes outputs/summary.md and figures
-python scripts/run_value.py     # MA C&I value: energy, life, kW, $ and CO2 -> outputs/value_summary.md
+python -m pytest -q             # 62 tests (2 need the paper data)
+python scripts/run_value.py     # the results above -> outputs/value_summary.md (about 20 minutes)
+python scripts/run_demo.py      # v1 fault-model demo (96-cell block) -> outputs/summary.md and figures
+node webapp/checks/crosscheck.js   # browser model vs Python headline
+node webapp/checks/paper_metrics.js  # fixed string vs the paper's beta_life / beta_energy / beta_power
+node webapp/checks/trace_pack.js     # one pack month by month, energy re-derived by hand
 ```
 
-**What it is worth (v2).** `reon_model/economics.py` turns the simulated energy into value for a Massachusetts commercial site (2 × REON EBS, Eversource G-2): ConnectedSolutions, demand charges, Clean Peak, REON's BMS cost overhead (+4–6% of system cost, from REON's CTO), CO₂ avoided and cells kept out of waste. Team default (v4: 250-cell strings with 25 backup cells, as REON described; 2,000 paired packs): **+12.1% lifetime energy and +10.6% service life per battery; +$4.3k NPV per two-block site over a 20-year horizon** (replacements at NREL-projected prices, NREL O&M, conservative 50% demand-charge capture); with 0.1% cell failures and conventional blocks replaced at their first failure, **2.3× the lifetime energy and +$87k per site** (`outputs/value_summary.md`). The web app has a customer view and an engineering view. Research: `docs/Reliability_and_Customers_Research.md`.
-
-**Interactive explorer:** open `webapp/index.html` in a browser (no server or build needed). It is a JavaScript port of the same model: sliders for every assumption, per-cell capacity rings for both designs over time, and the change in service life, lifetime energy and outages against both the fixed string and the default settings.
+The sections below document the model's building blocks (fault model, calibrated aging, controller). Section 3 shows the **v1 demo** (96-cell block, 4 backups, placeholder fault hazard); the current results are in the table above and in the methodology.
 
 > **What is calibrated and what is not.** The cell-to-cell aging *spread* (rates, knee onset, post-knee slopes and their correlations) comes from real per-cell data and is checked against held-out fleet metrics. The stationary *timeline* (fade per year, knee onset in years), the NMC-to-sodium-ion transfer, the pack design and every fault-hazard number are assumptions. Nothing here is a REON performance claim.
 
@@ -101,7 +117,7 @@ Two changes the data forced, compared with the earlier placeholders:
 
 **Limitation:** real cars differ from each other more than the model does, because every car is assumed to share one pre-knee rate.
 
-## 3. Results (calibrated aging, placeholder timeline and faults)
+## 3. v1 demo results (96-cell block, k = 4; superseded by the table at the top)
 
 The demo simulates one 96-cell, 59.5 kWh EBS-sized block cycled once a day and retired below 70% of nameplate.
 
@@ -149,6 +165,6 @@ tests/                         reduction-to-Poisson and model tests
 
 ## Next steps
 
-- Ask REON for the real voltage window (*k*), the switch loss and observed cell fault rates. *k* is now the parameter that matters most for capacity value.
-- Download the raw vehicle data (OneDrive link in the paper repo) to fit per-car pre-knee rates and the 17 LFP buses. Add a sodium-ion dataset (TUM) to test the chemistry transfer.
-- Add the economics layer: Massachusetts C&I demand charges, ConnectedSolutions payments, deferred augmentation, and the value of avoided outages. Then a sensitivity tornado.
+- Ask REON for the per-cell switch on-resistance (the main technical risk: 1 mΩ turns the 20-year gain negative), how the 10% backup cells count toward the 60 kWh rating, field cell-failure rates, and its cell vendor's capacity tolerance.
+- Replace the assumed demand-charge capture and peak duration with an NREL ComStock load profile for a grocery and a cold store.
+- Price looser-binned and second-life cells, to turn the cell-grade result into a dollar figure.

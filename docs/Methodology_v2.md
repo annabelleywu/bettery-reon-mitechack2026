@@ -1,4 +1,4 @@
-# Methodology (v2): what cell-level control is worth for a Massachusetts C&I battery
+# Methodology: what cell-level control is worth for a Massachusetts C&I battery
 
 MIT Energy & Climate Hack 2026 · REON challenge · updated Nov 7, 2026, 10 pm (v4: 20-year service-horizon economics with replacements, NREL costs and O&M, customers, cell grades, scale-up)
 
@@ -116,7 +116,7 @@ Q_i(a) = q_{0,i} - m_i\big[k_\text{cal}\sqrt{a} + k_\text{cyc}\,\text{EFC}_i(a)\
 
 **Early-knee outliers** (new, paper-aligned, default off). The paper attributes accelerated aging to cells with "less favourable initial conditions or harsher local operating histories". A share f of cells (default 0) gets its knee multiplied by 0.8. The data's weakest cell (2.92–3.05 SDs below mean) sits slightly further out than the model's (2.77), so a small share is consistent with the data.
 
-**Why the percentages are trusted but not the years.** Moving the knee from 6.6 to 10 or 14 years changes fixed-string life from 7.4 to 10.5 to 14.2 years, but the gain at k = 4 stays at about +6% energy (Methodology v1). The gain comes from the spread structure, which is data; the years come from the timeline, which is assumed.
+**Why the percentages are trusted but not the years.** Moving the knee from 6.6 to 10 or 14 years changes fixed-string life from 7.4 to 10.5 to 14.2 years, but the gain at k = 4 of 96 stays at about +6% (and at 25 of 250, +12.1% with the default knee against +11.8% with a 10-year knee) energy (Methodology v1). The gain comes from the spread structure, which is data; the years come from the timeline, which is assumed.
 
 ---
 
@@ -142,7 +142,7 @@ Q_\text{string}(h) = \sum_{i \in \text{active}} \min\!\big(Q_i,\; Q_{(h+1)}\big)
 
 **Policy, each month, in order:**
 1. **Isolate** (optional, off by default): take a cell out for good if it is a set distance below the pack mean, hotter, or higher-resistance.
-2. **Rest by remaining life** (default on): before the knee, rest the cells that would reach retirement first.
+2. **Rest by remaining life** (optional, off in the v4 headline because it adds nothing measurable with 25 backups): before the knee, rest the cells that would reach retirement first.
 3. **Rest hot cells** (optional, off by default; REON: "our BMS can let a 'hot' cell be bypassed and take a rest").
 4. **Discharge** with the remaining headroom (Section 4).
 5. **Age** every cell by what it actually did.
