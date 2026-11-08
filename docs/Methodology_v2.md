@@ -244,7 +244,7 @@ Installed cost $600/kWh is assumed for this 2-hour system (installer data for sm
 ## 9. Environmental value
 
 - **Operational CO₂**: extra AC MWh delivered over life × 597 lb CO₂/MWh, the ISO-NE 2024 average emission rate [S15]. This assumes the battery charges from on-site solar and that delivered energy displaces average grid generation. Peak-hour marginal units emit more, so this is conservative.
-- **Cells not manufactured**: over a 20-year storage need, an owner buys 20 / life blocks of capacity. Avoided kWh = kWh × 20 × (1/life_fixed − 1/life_cell). Embodied CO₂ = avoided kWh × 80 kg CO₂e/kWh (Fraunhofer 2025 comparative LCA: sodium-ion 75–87, LFP 58–92 kg CO₂e per kWh of cell [S16]); replace with REON's lithium LCA when shared. Material = avoided kWh × 7 kg/kWh (assumed cell mass; ask REON).
+- **Cells not manufactured**: over a 20-year storage need, an owner buys 20 / life blocks of capacity. Avoided kWh = kWh × 20 × (1/life_fixed − 1/life_cell). Embodied CO₂ = avoided kWh × 80 kg CO₂e/kWh (Fraunhofer 2024 comparative LCA: sodium-ion 75–87, LFP 58–92 kg CO₂e per kWh of cell [S16]); replace with REON's lithium LCA when shared. Material = avoided kWh × 7 kg/kWh (assumed cell mass; ask REON).
 
 ---
 
@@ -414,7 +414,7 @@ Order of influence: hard-failure response, backup count and cell spread (largest
 | ITC | 30% | Sourced | [S13][S14], FEOC caveat |
 | Discount rate | 8% | Assumed | |
 | Grid CO₂ | 597 lb/MWh | Sourced | ISO-NE 2024 average [S15] |
-| Embodied CO₂ | 80 kg/kWh | Sourced | Fraunhofer 2025, sodium-ion 75–87 [S16] |
+| Embodied CO₂ | 80 kg/kWh | Sourced | Fraunhofer 2024, sodium-ion 75–87 [S16] |
 | Cell mass | 7 kg/kWh | Assumed | Ask REON |
 | Fault rates | off | — | Paper has no fault data |
 
@@ -439,7 +439,7 @@ Order of influence: hard-failure response, backup count and cell spread (largest
 | S13 | Energy-Storage.news, storage ITC after the One Big Beautiful Bill Act | https://www.energy-storage.news/us-energy-storage-to-retain-momentum-post-reconciliation-bill-near-term-rush-to-complete-projects/ |
 | S14 | IRS Notice 2026-15 (FEOC material assistance) | https://www.irs.gov/pub/irs-drop/n-26-15.pdf |
 | S15 | ISO New England, 2024 Electric Generator Air Emissions Report | https://www.iso-ne.com/static-assets/documents/100028/final-2024-air-emission-report.pdf |
-| S16 | Fraunhofer, comparative LCA of lithium-ion, sodium-ion and solid-state cells (2025) | https://publica.fraunhofer.de/handle/publica/480983 |
+| S16 | Fraunhofer, comparative LCA of lithium-ion, sodium-ion and solid-state cells (2024) | https://publica.fraunhofer.de/handle/publica/480983 |
 | S17 | Challenge brief and REON hack slides (provided) | — |
 | S18 | REON one-pager "Who We Are" (provided) | — |
 | S19 | REON CTO Tim Ren, hack Discord, Nov 6–7, 2026 | Not public |

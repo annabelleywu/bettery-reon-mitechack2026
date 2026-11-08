@@ -1046,13 +1046,13 @@ const SRC = {
   nrel25: ["NREL, Cost Projections for Utility-Scale Battery Storage: 2025 Update", "https://docs.nrel.gov/docs/fy25osti/93281.pdf"],
   itc: ["Storage ITC schedule under current law (100% through 2033, 75% 2034, 50% 2035)", "https://natlawreview.com/article/congress-phases-out-energy-tax-credits"],
   isone: ["ISO New England, 2024 Air Emissions Report (597 lb CO₂/MWh)", "https://www.iso-ne.com/static-assets/documents/100028/final-2024-air-emission-report.pdf"],
-  fraun: ["Fraunhofer (2025), comparative LCA of Li-ion, Na-ion and solid-state cells", "https://publica.fraunhofer.de/handle/publica/480983"],
+  fraun: ["Fraunhofer (2024), comparative LCA of Li-ion, Na-ion and solid-state cells", "https://publica.fraunhofer.de/handle/publica/480983"],
   epri: ["EPRI (2026), Risk Factors and Failure Statistics of Li-ion BESS", "https://restservice.epri.com/publicdownload/000000003002034920/0/Product"],
   recur: ["US DOE / Recurrent: EV battery replacements due to failure (1.5%)", "https://www.energy.gov/cmei/vehicles/articles/fotw-1339-april-22-2024-plug-electric-vehicle-battery-replacements-due"],
   inst: ["NuWatt, MA commercial battery calculator (installed $500–800/kWh; installer source)", "https://nuwattenergy.com/en/massachusetts/commercial-demand-charge-battery-calculator-2026"],
   repo: ["Our methodology: every input, its source and the validation", "https://github.com/annabelleywu/mitec2026/blob/HEAD/docs/Methodology_v2.md"],
 };
-const srcLinks = ids => ids.map(id => SRC[id][1] ? `<a href="${SRC[id][1]}" target="_blank" rel="noopener">${SRC[id][0].split(/[,:(]/)[0].trim()}</a>` : SRC[id][0].split(/[,(]/)[0].trim()).join(" · ");
+const srcLinks = ids => ids.map(id => SRC[id][1] ? `<a href="${SRC[id][1]}">${SRC[id][0].split(/[,:(]/)[0].trim()}</a>` : SRC[id][0].split(/[,(]/)[0].trim()).join(" · ");
 const ASSUMPTIONS = [
   ["Cell-to-cell aging spread", "Fitted to 95 real cell trajectories; matches the paper's fleet metrics", "Data", ["zhou", "zhoudata"]],
   ["String design", "250 cells per string, 25 (10%) backup cells, 60 kWh / 30 kW per block", "REON", ["reon"]],

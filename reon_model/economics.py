@@ -47,7 +47,7 @@ class EconConfig:
     visit_cost: float = 1500.0           # $ per service visit to replace a failed cell or module (placeholder; $500-3,000)
     start_year: int = 2027
     grid_co2_lb_per_mwh: float = 597.0   # ISO-NE 2024 average emission rate
-    embodied_co2_kg_per_kwh: float = 80.0  # Fraunhofer 2025 LCA: sodium-ion 75-87 kg CO2e/kWh cell
+    embodied_co2_kg_per_kwh: float = 80.0  # Fraunhofer 2024 LCA: sodium-ion 75-87 kg CO2e/kWh cell
     cell_kg_per_kwh: float = 7.0         # placeholder; ask REON
     horizon_years: int = 20              # years of storage service the owner needs
     fom_frac: float = 0.025              # fixed O&M per year, share of installed cost (NREL ATB, commercial battery storage)
