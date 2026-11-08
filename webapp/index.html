@@ -93,7 +93,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible, select:focus-v
 .ring { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
 .ring svg { width: 100%; max-width: 360px; height: auto; }
 .ring .rt { font-weight: 700; font-size: 13.5px; }
-.rbadge{font-size:13px;font-weight:600;border-radius:999px;padding:4px 12px;margin:4px 0 2px;text-align:center}.rbadge.ok{background:var(--cell-soft);color:var(--ink)}.rbadge.dead{background:var(--fault);color:#fff}
+.rbadge{font-size:13px;font-weight:500;border-radius:999px;padding:4px 12px;margin:4px 0 2px;text-align:center}.rbadge.ok{background:var(--cell-soft);color:var(--ink)}.rbadge.dead{background:transparent;color:var(--fault);border:1px solid var(--fault)}
 .ring .rs { font-family: var(--font-data); font-size: 12px; color: var(--muted); text-align: center; }
 .timebar { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 .timebar input { flex: 1 1 200px; accent-color: var(--cell); }
@@ -952,9 +952,9 @@ function ringBadge(id, svg, tr, k) {
   const r = tr.life < YEARS - 1e-9 ? Math.round(tr.life / DT) : -1, yr = (tr.life).toFixed(1);
   const dead = r >= 0 && k >= r;
   el.className = "rbadge " + (dead ? "dead" : "ok");
-  el.textContent = dead ? (tr.byFault ? `Unusable: a cell failed at year ${yr}, battery replaced` : `Unusable: below ${P.retire}% since year ${yr}, battery replaced`)
+  el.textContent = dead ? (tr.byFault ? `Note: a cell failed at year ${yr}; this battery would be replaced` : `Note: below ${P.retire}% since year ${yr}; this battery would be replaced`)
     : r >= 0 ? (tr.byFault ? `In service · a cell fails at year ${yr}` : `In service · drops below ${P.retire}% at year ${yr}`) : `In service · stays usable for ${YEARS} years`;
-  svg.style.opacity = dead ? "0.35" : "1";
+  svg.style.opacity = "1";
 }
 
 // ---------------------------------------------------------------- orchestration
@@ -1047,7 +1047,7 @@ const CUSTOMERS = [
   .cmp td.c{width:34%}.cmp td.c .src{font-size:11px;color:var(--muted);margin-top:3px}.cmp td.c .src a{color:var(--cell)}.cmp tr.grp td{background:var(--cell-soft);font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:7px 12px;border-bottom:0}
   .cmpwrap{overflow-x:auto}
   .srcfold>summary{cursor:pointer;font-size:16px;font-weight:500;padding:12px 4px;list-style:revert}.trade .tn a{color:var(--cell)}
-  .rbadge{font-size:13px;font-weight:600;border-radius:999px;padding:4px 12px;margin:4px 0 2px;text-align:center}.rbadge.ok{background:var(--cell-soft);color:var(--ink)}.rbadge.dead{background:var(--fault);color:#fff}
+  .rbadge{font-size:13px;font-weight:500;border-radius:999px;padding:4px 12px;margin:4px 0 2px;text-align:center}.rbadge.ok{background:var(--cell-soft);color:var(--ink)}.rbadge.dead{background:transparent;color:var(--fault);border:1px solid var(--fault)}
   #tip{position:fixed;z-index:9999;display:none;max-width:min(400px,calc(100vw - 16px));background:#0a1a11;color:#f5f7f3;padding:11px 14px;border-radius:12px;font-size:14px;line-height:1.5;box-shadow:0 8px 28px rgba(0,0,0,.28);border:1px solid rgba(245,247,243,.3);pointer-events:none;font-family:var(--font-ui)}
   .cv .info{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;border:1.5px solid var(--cell);color:var(--cell);font-size:12px;font-weight:700;line-height:1;cursor:help;vertical-align:1px;margin-left:4px}
   .cv .info:hover,.cv .info:focus-visible{background:var(--cell);color:var(--bg);outline:none}.verdict .info{border-color:rgba(245,247,243,.6);color:#f5f7f3}.verdict .info:hover{background:#f5f7f3;color:#0a1a11}
