@@ -186,13 +186,13 @@ MIT Energy & Climate Hack 2026 · researched Nov 7, 2026 · every number links t
 | S28 | JD Supra, IRS guidance on material assistance (FEOC) | Law firm | https://www.jdsupra.com/legalnews/new-irs-guidance-clarifies-material-5011776/ |
 | S29 | Husch Blackwell, FEOC restrictions update | Law firm | https://www.huschblackwell.com/newsandinsights/feoc-restrictions-on-energy-tax-credits-an-update |
 | S30 | IRS Notice 2026-15 | Official | https://www.irs.gov/pub/irs-drop/n-26-15.pdf |
-| S31 | NREL ATB 2024, commercial battery storage | Official | https://atb.nrel.gov/electricity/2024/commercial_battery_storage |
+| S31 | NREL ATB 2024, commercial battery storage | Official | https://atb.nlr.gov/electricity/2024/commercial_battery_storage |
 | S32 | NREL ATB 2025, commercial battery storage | Official | https://atb.nlr.gov/electricity/2025/commercial_battery_storage |
 | S33 | Energy-Storage.news, Lazard 2025 LCOS | Trade press citing Lazard | https://www.energy-storage.news/lazard-says-us-energy-storage-cost-reduction-in-2025/ |
-| S34 | NREL ComStock public datasets | Official | https://comstock.nrel.gov/page/datasets |
+| S34 | NREL ComStock public datasets | Official | https://comstock.nlr.gov/page/datasets |
 | S35 | ComStock data documentation | Official | https://nrel.github.io/ComStock.github.io/docs/data.html |
 | S36 | AWS Open Data, End-Use Load Profiles for the U.S. Building Stock | Official | https://registry.opendata.aws/nrel-pds-building-stock/ |
-| S37 | NREL PVWatts | Official tool | https://pvwatts.nrel.gov |
+| S37 | NREL PVWatts | Official tool | https://pvwatts.nlr.gov |
 | S38 | Zhou et al. 2026 public data and code | Research | https://github.com/Rico-dicp/Ev-battery-cell-to-cell-inconsistency |
 | S39 | Business Wire, Lightshift six new MA projects (Jun 2026) | Press release | https://www.businesswire.com/news/home/20260622969127/en/Lightshift-Energy-Deploys-Six-New-Battery-Storage-Projects-in-Massachusetts |
 | S40 | iGrow News, Kearsarge Energy storage | Trade press | https://igrownews.com/kearsarge-energy-latest-news/ |

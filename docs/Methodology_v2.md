@@ -431,7 +431,7 @@ Order of influence: hard-failure response, backup count and cell spread (largest
 | S5 | NuWatt commercial storage calculator (cites Eversource Jul 2026 summary; installer) | https://nuwattenergy.com/en/commercial-solar/storage/calculator |
 | S6 | Eversource, 2024 Summary of Eastern MA Electric Rates, Greater Boston | https://www.eversource.com/Content/docs/default-source/rates-tariffs/ema-greater-boston-rates.pdf?sfvrsn=10 |
 | S7 | Nectar, National Grid MA rate guide (G-2 15-minute peak) | https://nectarclimate.com/rates/massachusetts-electric-national-grid |
-| S8 | NREL ComStock datasets | https://comstock.nrel.gov/page/datasets |
+| S8 | NREL ComStock datasets | https://comstock.nlr.gov/page/datasets |
 | S9 | Mass.gov, Clean Peak Energy Standard program review (ACP) | https://www.mass.gov/info-details/clean-peak-energy-standard-program-review |
 | S10 | Modo Energy, Massachusetts CPEC for BESS (Jul 2026) | https://modoenergy.com/research/isone-ma-clean-peak-cpec-bess-battery-storage |
 | S11 | Nectar, National Grid MA Basic Service (Jan 2026) | https://nectarclimate.com/rates/massachusetts-electric-national-grid |
@@ -444,9 +444,9 @@ Order of influence: hard-failure response, backup count and cell spread (largest
 | S18 | REON one-pager "Who We Are" (provided) | — |
 | S19 | REON CTO Tim Ren, hack Discord, Nov 6–7, 2026 | Not public |
 | S20 | Methodology v1 (Annabelle) and repo annabelleywu/mitec2026 | https://github.com/annabelleywu/mitec2026 |
-| S23 | Cole, Ramasamy and Turan, *Cost Projections for Utility-Scale Battery Storage: 2025 Update*, NREL/TP-6A40-93281 (mid case, normalized to 2024) | https://docs.nrel.gov/docs/fy25osti/93281.pdf |
+| S23 | Cole, Ramasamy and Turan, *Cost Projections for Utility-Scale Battery Storage: 2025 Update*, NREL/TP-6A40-93281 (mid case, normalized to 2024) | https://doi.org/10.2172/2583471 |
 | S24 | National Law Review on the OBBBA: storage credit 100% if construction begins by end-2033, 75% in 2034, 50% in 2035, 0% after | https://natlawreview.com/article/congress-phases-out-energy-tax-credits |
-| S25 | NREL Annual Technology Baseline, Commercial Battery Storage (fixed O&M 2.5% of capital cost; 2021 bottom-up costs) | https://atb.nrel.gov/electricity/2024/commercial_battery_storage |
+| S25 | NREL (now NLR) Annual Technology Baseline 2024, Commercial Battery Storage (fixed O&M 2.5% of capital cost; the 2025 edition uses 4%, which leaves the REON-minus-conventional gain unchanged because both systems pay it) | https://atb.nlr.gov/electricity/2024/commercial_battery_storage |
 | S26 | BloombergNEF via Energy-Storage.news: 2025 stationary-storage pack $70/kWh, average cell $74/kWh | https://www.energy-storage.news/li-ion-battery-pack-prices-fell-8-since-last-year-despite-metals-prices-rising-bloombergnef-says/ |
 | S27 | Benchmark Mineral Intelligence: LFP cells for BESS trade at a 10–15% discount to EV-grade cells | https://source.benchmarkminerals.com/article/benchmark-launches-314ah-lfp-bess-price-amid-global-storage-market-surge |
 | S28 | Mass. DOER Commissioner Mahony, NASEO 2026 Energy Policy Outlook (ConnectedSolutions enrolled 217.59 MW in 2024, 221.85 MW in 2025; 425 MW / 838 MWh existing storage) | https://energyoutlook2026.naseo.org/data/energymeetings/presentations/Elizabeth%20Mahony.pdf |
