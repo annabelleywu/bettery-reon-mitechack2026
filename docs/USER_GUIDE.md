@@ -30,7 +30,7 @@ The **Customer view** opens with these three panels:
 
 | Button | Site | Utility rate |
 |---|---|---|
-| NE Cold Storage (illustrative) | Independent frozen and refrigerated warehouse in Sturbridge, MA; 2 blocks; no solar on site. Tagged "Illustrative: inputs to be confirmed with NE Cold"; peak kW, monthly kWh, rate class and block count are placeholders | National Grid G-2, $15.06/kW (the closest model case) |
+| NE Cold Storage | Public frozen and refrigerated warehouse in Sturbridge, MA (about 120,000 sq ft, 25,000 pallet positions, six ALTA EXPERT refrigeration systems; sources linked in the dashboard); 2 blocks. Peak kW, monthly kWh and rate class are not public, so the closest model case is used until NE Cold shares its bills | National Grid G-2, $15.06/kW |
 | Neighborhood grocer | Refrigeration-heavy small business, 2 REON EBS blocks (60 kW / 120 kWh) | Eversource G-1 demand option, $41.65 per kW of monthly peak |
 | Mid-size business (default) | 2 blocks | Eversource G-2, $33.95/kW |
 | Cold-storage warehouse | Large site such as a regional cold store, 10 blocks | Eversource G-3, $30.05/kW |
@@ -78,7 +78,7 @@ A short "How to read this view" note sits at the top. Then:
 ## 5. A two-minute tour
 
 1. Customer view, default site: about +12% energy and +11% life per battery, about +$4k per site over 20 years.
-2. Click **NE Cold Storage (illustrative)** for the sales-meeting story: a National Grid site with no solar, about +$3.4k over 20 years in the dashboard (+$3.5k in the Python model). Then click **Cold-storage warehouse**: ten blocks, about five times the value of two.
+2. Click **NE Cold Storage** for the sales-meeting story: a National Grid site, solar left out of the results, about +$3.4k over 20 years in the dashboard (+$3.5k in the Python model). Then click **Cold-storage warehouse**: ten blocks, about five times the value of two.
 3. Choose **Aging plus cell failures**: the conventional battery's life roughly halves and REON's value jumps (in the range of REON's stated 2–3×; we do not claim to replicate their figure).
 4. Read the recommendation panel and the "The trade" card: a small extra upfront cost against the net gain after 20 years.
 5. Engineering view → move **Backup cells k** from 25 to 5, then to 125, and watch the gain shrink and grow.

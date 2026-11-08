@@ -52,7 +52,7 @@ For slides: about **+12% energy and +11% life per battery, +$4k to +$5k per two-
 
 | Brief requirement | How we meet it |
 |---|---|
-| Specific real-world application | Massachusetts C&I battery storage (solar optional), 2 × REON EBS, Eversource G-2; an illustrative National Grid site (New England Cold Storage) is also shown. REON's CTO asked for "depth over breadth" and "end customer first" (Discord). |
+| Specific real-world application | Massachusetts C&I battery storage (solar optional), 2 × REON EBS, Eversource G-2; a National Grid cold-storage site (New England Cold Storage, Sturbridge) is also shown as a customer example; see "NE Cold site facts" below. REON's CTO asked for "depth over breadth" and "end customer first" (Discord). |
 | Clear baseline | A fixed series string with passive balancing. The weakest cell ends every discharge; the pack retires when its energy falls below the threshold. The paper shows passive balancing holds SOC imbalance under 2% of capacity, so balancing is assumed to remove SOC imbalance but not capacity differences. |
 | Control case | The same cells, with REON's two given capabilities: per-cell monitoring (measured with noise) and selective bypass within a voltage-window limit k. |
 | Capacity recovery | Bypass on empty: usable charge Σ min(Qᵢ, Q₍ₖ₊₁₎) (Section 4). |
@@ -240,6 +240,31 @@ Installed cost $600/kWh is assumed for this 2-hour system (installer data for sm
 **Year-1 value per site** (fixed string): ConnectedSolutions $7.4k, demand charges $11.3k (at 50% capture), Clean Peak $2.0k, losses −$1.1k; net $19.7k before O&M (outputs/value_summary.md). Cell-level control is about 1% lower in year 1 (switch loss) and gains later through slower capacity loss and longer life.
 
 ---
+
+### NE Cold site facts (customer example)
+
+The Customer view includes New England Cold Storage (NECS) as a sales-meeting example. Only these facts come from public sources; nothing else about NECS is claimed.
+
+| Fact | Value | Source |
+|---|---|---|
+| Location | 6 Picker Rd, Sturbridge, MA; 18 acres; at I-90 and I-84 | [N1] |
+| Size | About 120,000 sq ft (120,662 sq ft total building area on the company's building page; 120,549 sq ft in the town permit application); about 95,000 sq ft frozen, including 96,000 sq ft of -10 °F convertible storage per the builder; 35 °F cold dock | [N7], [N2], [N3] |
+| Capacity | About 25,000 pallet positions; high-density mobile racking in two freezer rooms and double-deep racking in a convertible room; 15 dock doors | [N7], [N1] |
+| Refrigeration | Six ALTA EXPERT systems (non-ammonia, packaged) | [N2], [N4] |
+| Opened | August 2022 | [N4] |
+| Utility | National Grid (the Town of Sturbridge is served by National Grid) | [N5] |
+
+**Not public, so not claimed:** peak kW, monthly kWh, rate class, whether the site has any on-site generation, and the number of REON blocks. A site of this size probably exceeds 200 kW and so would be on National Grid G-3 (the threshold is 200 kW of demand [N6]), but we did not find the current G-3 demand charge, so the example uses the National Grid G-2 case already in the model ($15.06/kW, 2 blocks: +$3.5k over 20 years, low case +$1.2k, high case +$5.8k). The results do not include solar, and the dollar results do not depend on it (see Section 9 for the CO₂ treatment). If the site already trims its own peaks, the demand-charge capture assumed here (50%) could be lower, which is a question for the customer.
+
+| Ref | Source | URL |
+|---|---|---|
+| N1 | New England Cold Storage, company website | https://www.necold.com/ |
+| N7 | New England Cold Storage, "The Building" page (120,662 sq ft; about 95,000 sq ft frozen; about 25,000 pallet positions; mobile and double-deep racking) | https://www.necold.com/the-building/ |
+| N2 | ARCO Design/Build, New England Cold Storage project page | https://arcodb.com/projects/new-england-cold-storage/ |
+| N3 | Town of Sturbridge Planning Board, Special Permit & Site Plan Review, 6 Picker Road | https://www.sturbridge.gov/planning-board/webforms/special-permit-site-plan-review-new-england-cold-storage-6-picker-road |
+| N4 | New England Cold Storage, LinkedIn company page (opened August 2022; ALTA EXPERT) | https://www.linkedin.com/company/necold |
+| N5 | Town of Sturbridge, National Grid | https://www.sturbridge.gov/805/National-Grid |
+| N6 | Nectar, National Grid Massachusetts rate guide (G-3: more than 200 kW demand; peak hours 8 a.m.-9 p.m. weekdays) | https://nectarclimate.com/rates/massachusetts-electric-national-grid |
 
 ## 9. Environmental value
 

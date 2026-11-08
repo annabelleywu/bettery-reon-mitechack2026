@@ -1024,8 +1024,8 @@ $("play").addEventListener("click", () => {
 // ---------------------------------------------------------------- customer view (a second tab; the engineering view is unchanged)
 function tariffName(r) { return Math.abs(r - 41.65) < 0.01 ? "Eversource G-1 demand option" : Math.abs(r - 33.95) < 0.01 ? "Eversource G-2" : Math.abs(r - 30.05) < 0.01 ? "Eversource G-3" : Math.abs(r - 15.06) < 0.01 ? "National Grid G-2" : `$${r.toFixed(2)}/kW demand charge`; }
 const CUSTOMERS = [
-  { id: "necold", name: "NE Cold Storage (illustrative)", who: "New England Cold Storage (illustrative)", blurb: "Independent frozen and refrigerated warehouse in Sturbridge, MA on National Grid (G-2 demand charge, $15.06/kW), 2 blocks, no solar on site", set: { dcRate: 15.06, nBlocks: 2, solarShare: 0 },
-    note: "Illustrative: inputs to be confirmed with NE Cold. Known: Sturbridge, MA · National Grid · frozen and refrigerated storage · no solar on site. Placeholders until NE Cold shares its bills: peak kW, monthly kWh, rate class, number of blocks (the model case uses National Grid G-2 and 2 blocks)." },
+  { id: "necold", name: "NE Cold Storage", who: "New England Cold Storage", blurb: "Public frozen and refrigerated warehouse in Sturbridge, MA: about 120,000 sq ft (95,000 sq ft frozen), 25,000 pallet positions, six ALTA EXPERT refrigeration systems. Modeled on National Grid G-2 ($15.06/kW) with 2 blocks", set: { dcRate: 15.06, nBlocks: 2, solarShare: 0 },
+    note: `Site facts from <a href="https://www.necold.com/the-building/">necold.com</a>, <a href="https://arcodb.com/projects/new-england-cold-storage/">ARCO Design/Build</a> and the <a href="https://www.sturbridge.gov/planning-board/webforms/special-permit-site-plan-review-new-england-cold-storage-6-picker-road">Town of Sturbridge</a>. Peak kW, monthly kWh and rate class are not public, so this uses the closest model case (National Grid G-2, 2 blocks); NE Cold's own bills would replace it. These results do not include solar, and the dollar results do not depend on it.` },
   { id: "grocer", name: "Neighborhood grocer", blurb: "Refrigeration-heavy small business, Eversource G-1 demand option ($41.65/kW), 2 blocks", set: { dcRate: 41.65, nBlocks: 2, solarShare: 100 } },
   { id: "mid", name: "Mid-size business", blurb: "Eversource G-2 ($33.95/kW), 2 blocks", set: { dcRate: 33.95, nBlocks: 2, solarShare: 100 } },
   { id: "cold", name: "Cold-storage warehouse", blurb: "Large site such as a regional cold store, Eversource G-3 ($30.05/kW), 10 blocks", set: { dcRate: 30.05, nBlocks: 10, solarShare: 100 } },
@@ -1062,7 +1062,7 @@ const CUSTOMERS = [
   .cv .card h2{font-size:21px;font-weight:500;margin-bottom:6px}
   .story div{font-size:15.5px}.story b{font-size:16px}
   .cv .pick button{font-size:15px;padding:9px 18px}
-  .cv .illus{margin:8px 0 0;padding:10px 14px;border:1px solid #D9661F;border-radius:12px;font-size:14px;line-height:1.45;color:var(--ink)}
+  .cv .illus{margin:8px 0 0;font-size:13px;line-height:1.5;color:var(--muted)}.cv .illus a{color:inherit;text-decoration:underline}
   .scen{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}@media(max-width:800px){.scen{grid-template-columns:1fr}}
   .scen button{display:flex;flex-direction:column;gap:4px;text-align:left;border-radius:16px;padding:14px 18px;border:1.5px solid var(--rule);background:var(--panel);color:var(--ink)}
   .scen button .t{font-size:17px;font-weight:600}.scen button .d{font-size:14px;line-height:1.45;color:var(--muted)}
