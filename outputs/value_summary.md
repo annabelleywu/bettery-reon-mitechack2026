@@ -2,7 +2,7 @@
 
 2 x REON EBS (60 kW / 120 kWh nominal; 250 cells per string, 10% backups), Eversource Greater Boston G-2, from 2027. Team default: 2000 packs per design; other cases: 600; fault cases: 1000. Identical cells in both designs. Inputs and sources: `docs/Methodology_v2.md`, `docs/Reliability_and_Customers_Research.md`, `reon_model/economics.py`.
 
-Energy and life: means over packs. **Money is compared over a 20-year service horizon**: when a block retires the owner buys a new one at that year's price (NREL 2025 mid-case decline) and ITC rate (full through 2033, 75% in 2034, 50% in 2035, none after), pays fixed O&M of 2.5% of installed cost a year (NREL ATB), and is credited straight-line salvage for the block in service at year 20. NPV gains are means of each pack's paired difference, with P10 and P90.
+Energy and life: means over packs. **Money is compared over a 20-year service horizon**: when a block retires the owner buys a new one at that year's price (NLR, formerly NREL, 2025 mid-case decline) and ITC rate (full through 2033, 75% in 2034, 50% in 2035, none after), pays fixed O&M of 4% of installed cost a year (NLR ATB 2025), and is credited straight-line salvage for the block in service at year 20. NPV gains are means of each pack's paired difference, with P10 and P90.
 
 ## Team default, per site, over 20 years
 
@@ -11,10 +11,10 @@ Energy and life: means over packs. **Money is compared over a 20-year service ho
 | Blocks bought per position over 20 y | 3.07 | 3.00 |
 | Installed cost, present value (after ITC) | $92,979 | $93,511 |
 | Revenue, present value (ConnectedSolutions + demand charges + Clean Peak) | $186,856 | $189,708 |
-| Fixed O&M, present value | $17,673 | $17,673 |
+| Fixed O&M, present value | $28,276 | $28,276 |
 | Salvage at year 20, present value | $3,373 | $5,543 |
-| **20-year NPV** | **$69,452** | **$73,788** |
-| Simple payback (median) | 2.9 y | 3.0 y |
+| **20-year NPV** | **$58,848** | **$63,185** |
+| Simple payback (median) | 3.1 y | 3.2 y |
 | Energy delivered over 20 y (AC) | 752 MWh | 764 MWh |
 | Service life per block (mean) | 7.30 y | 8.07 y |
 | Year 1: ConnectedSolutions / demand charges / Clean Peak / losses | $7,416 / $11,329 / $2,013 / -$1,107 | $7,460 / $11,398 / $2,025 / -$1,114 |
@@ -92,4 +92,4 @@ Chance that a fault stops a 250-cell block (arithmetic, no aging):
 | 100 ppm per cell-year | 2.5% | 22.1% | about 0 | about 0 |
 | 1000 ppm per cell-year | 22.1% | 91.8% | about 0 | about 0 |
 
-Run time 1204 s.
+Run time 1239 s.

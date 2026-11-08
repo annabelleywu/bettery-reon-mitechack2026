@@ -50,7 +50,7 @@ class EconConfig:
     embodied_co2_kg_per_kwh: float = 80.0  # Fraunhofer 2024 LCA: sodium-ion 75-87 kg CO2e/kWh cell
     cell_kg_per_kwh: float = 7.0         # placeholder; ask REON
     horizon_years: int = 20              # years of storage service the owner needs
-    fom_frac: float = 0.025              # fixed O&M per year, share of installed cost (NREL ATB, commercial battery storage)
+    fom_frac: float = 0.04               # fixed O&M per year, share of installed cost (NREL/NLR ATB 2025, commercial battery storage; 2024 edition: 2.5%)
     # NREL "Cost Projections for Utility-Scale Battery Storage: 2025 Update" (Cole, Ramasamy, Turan), mid case,
     # cost relative to 2024: used for the price of replacement blocks bought later in the horizon
     cost_curve: tuple = ((2024, 1.00), (2030, 0.84), (2035, 0.73), (2040, 0.66), (2050, 0.53))
@@ -114,7 +114,7 @@ def horizon_value(res, pack, econ: EconConfig, cell_level: bool) -> dict:
     designs last different times. When a block retires (capacity limit or, in 'retire' mode, a hard fault), the
     owner installs a new block at that year's price (NREL mid-case decline) and ITC rate. Replacement block j of
     pack p behaves like simulated pack (p + j * 7919) mod P, so replacements are fresh, independent draws and both
-    designs use the same mapping (paired). Fixed O&M (NREL ATB 2.5% of installed cost a year) is paid every year.
+    designs use the same mapping (paired). Fixed O&M (NLR ATB 2025: 4% of installed cost a year) is paid every year.
     The block in service at the end of the horizon is credited with straight-line salvage value. Arrays (P,)."""
     P, K = res.energy_kwh.shape
     spy = pack.steps_per_year

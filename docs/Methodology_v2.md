@@ -21,8 +21,8 @@ This document describes the full model behind the Cell Bypass Explorer web app (
 | Lifetime energy per block (AC) | — | — | **+12.1%** (mean over packs) |
 | Service life per block (to 70% of nameplate energy; mean) | 7.30 y | 8.07 y | **+10.6%** |
 | Block-lifetimes used up over 20 years (per site) | 5.5 | 5.0 | −0.5 blocks (32 kWh of batteries not built) |
-| 20-year NPV per site (replacements, O&M, salvage included) | $69.5k | $73.8k | **+$4.3k** (P10 +$2.0k, P90 +$6.7k), after REON's +4% BMS cost |
-| Simple payback | 2.9 y | 3.0 y | +0.1 y |
+| 20-year NPV per site (replacements, O&M, salvage included) | $58.8k | $63.2k | **+$4.3k** (P10 +$2.0k, P90 +$6.7k), after REON's +4% BMS cost |
+| Simple payback | 3.1 y | 3.2 y | +0.1 y |
 | CO₂ avoided over 20 y | — | — | 3.2 t (operation) + 2.5 t (cells not manufactured) |
 
 **With hard cell failures** (same rate for every cell; Section 10), 20-year NPV gain per site:
@@ -229,9 +229,9 @@ Round-trip efficiency 88% is assumed; energy price from National Grid commercial
 ```latex
 \text{Capex} = \$600/\text{kWh} \times 60\,\text{kWh} \times (1 + \text{overhead}_\text{cell}) \times (1 - 0.30)
 ```
-Installed cost $600/kWh is assumed for this 2-hour system (installer data for small Massachusetts C&I: $500–800/kWh installed [S12]; NREL ATB's bottom-up commercial 4-hour system was about $480/kWh in 2020 dollars, and shorter systems cost more per kWh [S25]). 30% investment tax credit: storage keeps it for projects beginning construction by 2033, subject to FEOC sourcing rules [S13, S14]; REON's cell origin is unknown.
+Installed cost $600/kWh is assumed for this 2-hour system (installer data for small Massachusetts C&I: $500–800/kWh installed [S12]; shorter systems cost more per kWh). 30% investment tax credit: storage keeps it for projects beginning construction by 2033, subject to FEOC sourcing rules [S13, S14]; REON's cell origin is unknown.
 
-**20-year service horizon (headline).** The owner needs storage for 20 years. When a block retires (capacity below 70% of nameplate or, in the 'retire' case, a hard fault), the owner buys a new block at that year's installed price, which falls along NREL's 2025 mid-case projection for 4-hour batteries (relative to 2024: 0.84 in 2030, 0.73 in 2035, 0.66 in 2040, 0.53 in 2050) [S23], and receives that year's ITC (30% for construction starting through 2033, 22.5% in 2034, 15% in 2035, none after) [S24]. Replacement block j of pack p behaves like simulated pack (p + 7919 j) mod P, so replacements are fresh, independent draws and both designs use the same mapping (paired). Fixed O&M is 2.5% of installed cost a year for both designs, NREL ATB's value for commercial battery storage [S25]. The block in service at year 20 is credited straight-line salvage. NPV = − Σ capex (discounted to purchase month) + Σ_y (CS + DC + CPS − losses − visits − O&M) / 1.08^(y+1) + salvage. NPV gains are means of each pack's paired difference, with P10 and P90. The earlier comparison over each design's own first life (no replacement, no O&M) is still reported as "own-life NPV". A hand-calculated test checks the horizon NPV (`tests/test_v3_faults.py`).
+**20-year service horizon (headline).** The owner needs storage for 20 years. When a block retires (capacity below 70% of nameplate or, in the 'retire' case, a hard fault), the owner buys a new block at that year's installed price, which falls along NREL's 2025 mid-case projection for 4-hour batteries (relative to 2024: 0.84 in 2030, 0.73 in 2035, 0.66 in 2040, 0.53 in 2050) [S23], and receives that year's ITC (30% for construction starting through 2033, 22.5% in 2034, 15% in 2035, none after) [S24]. Replacement block j of pack p behaves like simulated pack (p + 7919 j) mod P, so replacements are fresh, independent draws and both designs use the same mapping (paired). Fixed O&M is 4% of installed cost a year for both designs, the 2025 NLR (formerly NREL) ATB value for commercial battery storage (the 2024 edition used 2.5%; the gain is unchanged because both designs pay it) [S25]. The block in service at year 20 is credited straight-line salvage. NPV = − Σ capex (discounted to purchase month) + Σ_y (CS + DC + CPS − losses − visits − O&M) / 1.08^(y+1) + salvage. NPV gains are means of each pack's paired difference, with P10 and P90. The earlier comparison over each design's own first life (no replacement, no O&M) is still reported as "own-life NPV". A hand-calculated test checks the horizon NPV (`tests/test_v3_faults.py`).
 
 **Realism.** Demand-charge capture is set to a conservative 50% of the theoretical saving (75% as a sensitivity), because the battery cannot cover every monthly peak. Still not included: interconnection and permitting, aggregator or software fees, and a ConnectedSolutions rate change after its 5-year lock. Massachusetts is among the best US markets for behind-the-meter storage (G-2 demand charges of $33.95/kW and ConnectedSolutions at $200/kW), so paybacks of about 3 years before those costs are plausible but optimistic; the REON-vs-conventional gain is much less sensitive to them than the absolute values.
 
@@ -406,7 +406,7 @@ Order of influence: hard-failure response, backup count and cell spread (largest
 | ConnectedSolutions | $200/kW-summer, 3 h, 45 event days | Sourced | [S3] |
 | Demand charge | $33.95/kW-month | Sourced | [S5][S6] |
 | Peak duration, realization | 2 h, 50% (75% sensitivity) | Assumed | Replace with ComStock |
-| Fixed O&M; replacement price path; ITC schedule | 2.5% of installed cost a year; NREL 2025 mid case; 30% to 2033, 22.5% 2034, 15% 2035 | Sourced | S23–S25 |
+| Fixed O&M; replacement price path; ITC schedule | 4% of installed cost a year (NLR ATB 2025); NLR/NREL 2025 mid case; 30% to 2033, 22.5% 2034, 15% 2035 | Sourced | S23–S25 |
 | Clean Peak | 87% × ACP ($65 / $45), 1.0× | Sourced | [S9][S10] |
 | Energy price | $0.20/kWh | Sourced | [S11] |
 | Round-trip / inverter efficiency | 88% / 96% | Assumed | Ask REON |
@@ -446,7 +446,7 @@ Order of influence: hard-failure response, backup count and cell spread (largest
 | S20 | Methodology v1 (Annabelle) and repo annabelleywu/mitec2026 | https://github.com/annabelleywu/mitec2026 |
 | S23 | Cole, Ramasamy and Turan, *Cost Projections for Utility-Scale Battery Storage: 2025 Update*, NREL/TP-6A40-93281 (mid case, normalized to 2024) | https://doi.org/10.2172/2583471 |
 | S24 | National Law Review on the OBBBA: storage credit 100% if construction begins by end-2033, 75% in 2034, 50% in 2035, 0% after | https://natlawreview.com/article/congress-phases-out-energy-tax-credits |
-| S25 | NREL (now NLR) Annual Technology Baseline 2024, Commercial Battery Storage (fixed O&M 2.5% of capital cost; the 2025 edition uses 4%, which leaves the REON-minus-conventional gain unchanged because both systems pay it) | https://atb.nlr.gov/electricity/2024/commercial_battery_storage |
+| S25 | NLR (formerly NREL) Annual Technology Baseline 2025, Commercial Battery Storage (fixed O&M 4% of capital cost a year; the 2024 edition used 2.5%; both systems pay it, so the REON-minus-conventional gain is unchanged) | https://atb.nlr.gov/electricity/2025/commercial_battery_storage |
 | S26 | BloombergNEF via Energy-Storage.news: 2025 stationary-storage pack $70/kWh, average cell $74/kWh | https://www.energy-storage.news/li-ion-battery-pack-prices-fell-8-since-last-year-despite-metals-prices-rising-bloombergnef-says/ |
 | S27 | Benchmark Mineral Intelligence: LFP cells for BESS trade at a 10–15% discount to EV-grade cells | https://source.benchmarkminerals.com/article/benchmark-launches-314ah-lfp-bess-price-amid-global-storage-market-surge |
 | S28 | Mass. DOER Commissioner Mahony, NASEO 2026 Energy Policy Outlook (ConnectedSolutions enrolled 217.59 MW in 2024, 221.85 MW in 2025; 425 MW / 838 MWh existing storage) | https://energyoutlook2026.naseo.org/data/energymeetings/presentations/Elizabeth%20Mahony.pdf |

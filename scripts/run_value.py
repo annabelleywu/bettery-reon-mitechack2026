@@ -174,8 +174,8 @@ def main():
         "`reon_model/economics.py`.",
         "",
         "Energy and life: means over packs. **Money is compared over a 20-year service horizon**: when a block retires "
-        "the owner buys a new one at that year's price (NREL 2025 mid-case decline) and ITC rate (full through 2033, "
-        "75% in 2034, 50% in 2035, none after), pays fixed O&M of 2.5% of installed cost a year (NREL ATB), and is "
+        "the owner buys a new one at that year's price (NLR, formerly NREL, 2025 mid-case decline) and ITC rate (full through 2033, "
+        "75% in 2034, 50% in 2035, none after), pays fixed O&M of 4% of installed cost a year (NLR ATB 2025), and is "
         "credited straight-line salvage for the block in service at year 20. NPV gains are means of each pack's paired "
         "difference, with P10 and P90.",
         "",

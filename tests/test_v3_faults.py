@@ -60,7 +60,7 @@ def test_horizon_value_hand_calculation():
     # yearly cash flow is the same every year; no salvage (second block ends exactly at the horizon)
     e = 60 * 0.96
     yearly = (200 * min(30, e / 3) + 12 * 33.95 * ec.dc_realization * min(30, e / 2)
-              - e / 1000 * 365 * (1 / 0.88 - 1) * 200 - 0.025 * 600 * 60)
+              - e / 1000 * 365 * (1 / 0.88 - 1) * 200 - ec.fom_frac * 600 * 60)
     cps = sum(0.87 * ec.acp(2027 + y) * e / 1000 * (365 - 45) / 1.08 ** (y + 1) for y in range(20))
     annuity = sum(1 / 1.08 ** (y + 1) for y in range(20))
     assert np.isclose(v["npv"][0], yearly * annuity + cps - (c1 + c2), rtol=1e-9)
