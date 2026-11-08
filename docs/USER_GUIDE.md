@@ -1,4 +1,4 @@
-# User guide: the REON Cell Bypass Explorer
+# User guide: the C&I Battery Cell Bypass Explorer
 
 A dashboard that shows what REON's cell-level control is worth to a Massachusetts commercial battery owner, compared with the same cells in a conventional battery.
 
@@ -35,8 +35,8 @@ The **Customer view** opens with these three panels:
 | Cold-storage warehouse | Large site such as a regional cold store, 10 blocks | Eversource G-3, $30.05/kW |
 
 **Which scenario?** Two cards decide what the numbers assume:
-- **Base case** (default): cells wear out at different speeds, as measured in real electric-vehicle batteries, and no cell fails suddenly. This is the number we can back with data.
-- **Cell failures included (upside case):** also assumes 1 in 1,000 cells fails each year (an assumption; no public data) and a conventional battery is replaced whenever one cell fails. In this scenario our model gives REON roughly 2× the energy and life, in the range of the 2–3× REON states. We do not know how REON measured theirs, so this is an upside scenario, not a replication. The recommendation panel shows a "Base case" or "Cell failures included" tag so it is always clear which one you are looking at.
+- **Normal aging** (default): cells wear out at slightly different speeds, as measured in real electric-vehicle batteries; no cell fails suddenly. This is the base case.
+- **Aging plus cell failures:** also assumes about 1 in 1,000 cells fails each year (an assumption; no public field data) and a conventional battery is replaced whenever one cell fails. Our model then gives REON roughly 2× the energy and life, in the range of the 2–3× REON states; we do not know how REON measured theirs, so treat it as an upside scenario, not a replication. The recommendation panel carries a tag naming the scenario.
 
 **The recommendation panel** (dark green) answers the customer's question in one line: which option comes out ahead over 20 years, and by how much (with the range across simulated batteries). Beside it, **What decides it** lists:
 - **The trade.** What REON's cell-level control adds to the upfront price after the tax credit (about $2,000 for the default site) against how far ahead the customer is after 20 years once that extra cost and replacements are counted. The "The trade" card below shows it as two numbers and two bars.
@@ -45,7 +45,7 @@ The **Customer view** opens with these three panels:
 
 **Six at-a-glance tiles.** Paired bars for net value, battery life, energy delivered, payback, batteries bought and the chance one cell stops the battery; green text marks where REON is better, red where it is not.
 
-**Two cards.** A line chart of usable energy over time (each line ends when that battery is replaced) and "The trade": the extra upfront cost against the net gain. A **How we sized one REON block** line near the top says where 250 cells, 25 backups and 60 kWh come from (our picks inside REON's stated ranges, to be confirmed with REON). The price REON could charge and still pay off ("price headroom") is in the Engineering view, since it is a pricing question for REON, not for the customer.
+**Two cards.** A line chart of usable energy over time (each line ends when that battery is replaced) and "The trade": the extra upfront cost against the net gain. An **Inside one REON block** line near the top shows 250 cells, 25 spare cells and 60 kWh / 30 kW (our picks inside REON's stated 200–300 cells per string and about 10% spares; to be confirmed with REON). The price REON could charge and still pay off ("price headroom") is in the Engineering view, since it is a pricing question for REON, not for the customer.
 
 **Side-by-side table.** One column for a conventional battery and one for REON with the same cells, site and tariff, plus a difference column. A ✓ marks the better option on each line. Hover over (or tap) **ⓘ** to see how a line is calculated; the links under each line go to its sources.
 
@@ -58,7 +58,7 @@ The **Customer view** opens with these three panels:
 
 REON is not better on every line: it costs a little more upfront and its switches lose a little energy. The table shows those trade-offs next to the gains so a customer can weigh them.
 
-**Assumptions and sources** at the bottom lists every input, its value, whether it is data, from REON, sourced or assumed, and a link to the source.
+**Assumptions and sources** (a fold-out at the bottom of the Customer view, always open in the Engineering view) lists every input, its value, whether it is data, from REON, sourced or assumed, and a link to the source.
 
 ## 4. Engineering view (for REON's engineers and anyone checking the model)
 
@@ -76,7 +76,7 @@ A short "How to read this view" note sits at the top. Then:
 
 1. Customer view, default site: about +12% energy and +11% life per battery, about +$4k per site over 20 years.
 2. Click **Cold-storage warehouse**: ten blocks, about five times the value.
-3. Choose **Cell failures included**: the conventional battery's life roughly halves and REON's value jumps (in the range of REON's stated 2–3×; we do not claim to replicate their figure).
+3. Choose **Aging plus cell failures**: the conventional battery's life roughly halves and REON's value jumps (in the range of REON's stated 2–3×; we do not claim to replicate their figure).
 4. Read the recommendation panel and the "The trade" card: a small extra upfront cost against the net gain after 20 years.
 5. Engineering view → move **Backup cells k** from 25 to 5, then to 125, and watch the gain shrink and grow.
 6. Move **Cell-to-cell spread, multiple of the calibrated spread** (under Cell aging) to 2×: more uneven cells make REON worth more.
@@ -86,3 +86,7 @@ A short "How to read this view" note sits at the top. Then:
 The dashboard simulates 48 batteries per design so the sliders stay fast, so its numbers move by about ±0.5 points between settings. **The official numbers come from the Python model at 2,000 batteries per design** in [`outputs/value_summary.md`](../outputs/value_summary.md). The two agree within about 0.3 points and $300 at equal settings (`node webapp/checks/crosscheck.js`). The method, every source and the limitations are in [`docs/Methodology_v2.md`](Methodology_v2.md).
 
 Estimates under stated assumptions, not REON performance claims.
+
+## 7. Customer view vs Engineering view wording
+
+The Customer view is written for a site owner: no percentile ranges or modelling caveats on the page. Those live in the ⓘ tooltips, the "Assumptions and sources" fold-out, the Engineering view and these docs. The Engineering view also shows REON's price headroom and, above each cell ring, when that battery becomes unusable (below 70% of rated energy, or a failed cell in the failure scenario).

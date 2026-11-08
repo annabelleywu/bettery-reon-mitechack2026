@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Cell Bypass Explorer</title>
+<title>C&amp;I Battery Cell Bypass Explorer</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -93,6 +93,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible, select:focus-v
 .ring { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
 .ring svg { width: 100%; max-width: 360px; height: auto; }
 .ring .rt { font-weight: 700; font-size: 13.5px; }
+.rbadge{font-size:13px;font-weight:600;border-radius:999px;padding:4px 12px;margin:4px 0 2px;text-align:center}.rbadge.ok{background:var(--cell-soft);color:var(--ink)}.rbadge.dead{background:var(--fault);color:#fff}
 .ring .rs { font-family: var(--font-data); font-size: 12px; color: var(--muted); text-align: center; }
 .timebar { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 .timebar input { flex: 1 1 200px; accent-color: var(--cell); }
@@ -130,8 +131,8 @@ fieldset.choice.off { opacity: 0.45; }
   <header>
     <div>
       <p class="eyebrow">MIT Energy &amp; Climate Hack 2026 · REON challenge “Beyond the Weakest Cell” · independent team analysis</p>
-      <h1>Cell Bypass Explorer</h1>
-      <p class="sub">How much does switching individual cells in and out of a series string buy, against a fixed string, for REON EBS blocks (30 kW / 60 kWh) at a Massachusetts commercial site, and what is it worth to the owner? Chemistry-agnostic: the cell-to-cell spread is an input. Move any assumption; the simulation reruns in your browser.</p>
+      <h1>C&amp;I Battery Cell Bypass Explorer</h1>
+      <p class="sub">What cell-level battery control is worth to a commercial and industrial (C&amp;I) battery owner in Massachusetts. Pick a customer and a scenario below; the Engineering view shows every assumption.</p>
     </div>
     <div class="status" id="status" aria-live="polite">Simulating…</div>
   </header>
@@ -153,8 +154,8 @@ fieldset.choice.off { opacity: 0.45; }
         <h2 id="ringTitle">One spoke = one cell</h2>
         <p class="cap">Spoke length is each cell's capacity (scale 50% to 100% of nameplate). The dashed circle is where the string stops on a discharge: everything beyond it is stranded. A fixed string stops at its weakest cell. With cell-level control, up to k cells can drop out and the string runs on to the next limit.</p>
         <div class="rings">
-          <div class="ring"><div class="rt" style="color:var(--fixed)">Fixed series string</div><svg id="ringFixed" viewBox="0 0 360 360" role="img" aria-label="Fixed string cell capacities"></svg><div class="rs" id="rsFixed"></div></div>
-          <div class="ring"><div class="rt" style="color:var(--cell)">Cell-level control</div><svg id="ringCell" viewBox="0 0 360 360" role="img" aria-label="Cell-level control cell capacities"></svg><div class="rs" id="rsCell"></div></div>
+          <div class="ring"><div class="rt" style="color:var(--fixed)">Fixed series string</div><div class="rbadge ok" id="rbFixed"></div><svg id="ringFixed" viewBox="0 0 360 360" role="img" aria-label="Fixed string cell capacities"></svg><div class="rs" id="rsFixed"></div></div>
+          <div class="ring"><div class="rt" style="color:var(--cell)">Cell-level control</div><div class="rbadge ok" id="rbCell"></div><svg id="ringCell" viewBox="0 0 360 360" role="img" aria-label="Cell-level control cell capacities"></svg><div class="rs" id="rsCell"></div></div>
         </div>
         <div class="timebar">
           <button id="play" type="button" aria-label="Play through the years">Play</button>
@@ -511,6 +512,7 @@ function simPack(p0, mode, pk, trace) {
   let mwh = 0; for (let k = 0; k < first; k++) mwh += energy[k] * avail[k] * p.cpy * DT / 1000;
   let av = 0; for (let k = 0; k < K; k++) av += avail[k];
   const firmKW = F(K); for (let k = 0; k < K; k++) firmKW[k] = k < first ? Math.min(p.ratedKW, energy[k] / p.duration) * avail[k] : 0;
+  if (tr) { tr.life = first * DT; tr.byFault = byFault; }
   return { energy, availM: avail, ret, firmKW, bpow, life: first * DT, mwh, visits, faults, avail: av / K, nIso, restSteps, tr, visitM, byFault };
 }
 
@@ -944,6 +946,17 @@ function renderBars(svgId, rows, xLabel) {
   svg.innerHTML = parts.join("");
 }
 
+// badge above each ring: when this battery drops below the retirement line (unusable, replaced)
+function ringBadge(id, svg, tr, k) {
+  const el = $(id); if (!el) return;
+  const r = tr.life < YEARS - 1e-9 ? Math.round(tr.life / DT) : -1, yr = (tr.life).toFixed(1);
+  const dead = r >= 0 && k >= r;
+  el.className = "rbadge " + (dead ? "dead" : "ok");
+  el.textContent = dead ? (tr.byFault ? `Unusable: a cell failed at year ${yr}, battery replaced` : `Unusable: below ${P.retire}% since year ${yr}, battery replaced`)
+    : r >= 0 ? (tr.byFault ? `In service · a cell fails at year ${yr}` : `In service · drops below ${P.retire}% at year ${yr}`) : `In service · stays usable for ${YEARS} years`;
+  svg.style.opacity = dead ? "0.35" : "1";
+}
+
 // ---------------------------------------------------------------- orchestration
 let CUR = null, DEF = null, timer = null, sweepToken = 0;
 function renderTime() {
@@ -952,6 +965,7 @@ function renderTime() {
   $("yearOut").textContent = `Year ${(k * DT).toFixed(1)}`;
   renderRing($("ringFixed"), CUR.fixed.tr, k, P.N, false, $("rsFixed"));
   renderRing($("ringCell"), CUR.cell.tr, k, P.N, true, $("rsCell"));
+  ringBadge("rbFixed", $("ringFixed"), CUR.fixed.tr, k); ringBadge("rbCell", $("ringCell"), CUR.cell.tr, k);
   renderRetention(CUR, DEF, k);
   renderKPIs(CUR, DEF, k);
   const err = CUR.cell.tr.estErr[k];
@@ -992,7 +1006,7 @@ function recompute() {
   renderTime();
   renderEcon(CUR);
   renderCustomer(CUR);
-  $("status").textContent = `${P.packs} packs × 2 designs × ${YEARS} years in ${Math.round(performance.now() - t0)} ms`;
+  $("status").textContent = "";
   runSweeps(++sweepToken);
 }
 function changed() { syncAvailability(); $("status").textContent = "Simulating…"; clearTimeout(timer); timer = setTimeout(recompute, 140); }
@@ -1032,6 +1046,8 @@ const CUSTOMERS = [
   .cmp td.v.win{color:var(--cell);font-weight:600}.cmp td.v.win::after{content:" ✓";color:var(--accent)}.cmp td.d{font-family:var(--font-data);white-space:nowrap;width:14%;color:var(--muted)}.cmp td.d.pos{color:var(--good)}.cmp td.d.neg{color:var(--fault)}
   .cmp td.c{width:34%}.cmp td.c .src{font-size:11px;color:var(--muted);margin-top:3px}.cmp td.c .src a{color:var(--cell)}.cmp tr.grp td{background:var(--cell-soft);font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:7px 12px;border-bottom:0}
   .cmpwrap{overflow-x:auto}
+  .srcfold>summary{cursor:pointer;font-size:16px;font-weight:500;padding:12px 4px;list-style:revert}.trade .tn a{color:var(--cell)}
+  .rbadge{font-size:13px;font-weight:600;border-radius:999px;padding:4px 12px;margin:4px 0 2px;text-align:center}.rbadge.ok{background:var(--cell-soft);color:var(--ink)}.rbadge.dead{background:var(--fault);color:#fff}
   #tip{position:fixed;z-index:9999;display:none;max-width:min(400px,calc(100vw - 16px));background:#0a1a11;color:#f5f7f3;padding:11px 14px;border-radius:12px;font-size:14px;line-height:1.5;box-shadow:0 8px 28px rgba(0,0,0,.28);border:1px solid rgba(245,247,243,.3);pointer-events:none;font-family:var(--font-ui)}
   .cv .info{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;border:1.5px solid var(--cell);color:var(--cell);font-size:12px;font-weight:700;line-height:1;cursor:help;vertical-align:1px;margin-left:4px}
   .cv .info:hover,.cv .info:focus-visible{background:var(--cell);color:var(--bg);outline:none}.verdict .info{border-color:rgba(245,247,243,.6);color:#f5f7f3}.verdict .info:hover{background:#f5f7f3;color:#0a1a11}
@@ -1092,6 +1108,7 @@ const SRC = {
   modo: ["Modo Energy, Massachusetts CPEC prices for batteries (Jul 2026)", "https://modoenergy.com/research/isone-ma-clean-peak-cpec-bess-battery-storage"],
   atb: ["NLR (formerly NREL) Annual Technology Baseline 2025, Commercial Battery Storage (fixed O&M 4% of capital cost a year)", "https://atb.nlr.gov/electricity/2025/commercial_battery_storage"],
   nrel25: ["NREL/NLR, Cost Projections for Utility-Scale Battery Storage: 2025 Update", "https://doi.org/10.2172/2583471"],
+  irc48e: ["26 U.S.C. § 48E, Clean Electricity Investment Credit: 30% for energy storage under 1 MW", "https://www.law.cornell.edu/uscode/text/26/48E"],
   itc: ["Storage ITC schedule under current law (100% through 2033, 75% 2034, 50% 2035)", "https://natlawreview.com/article/congress-phases-out-energy-tax-credits"],
   isone: ["ISO New England, 2024 Air Emissions Report (597 lb CO₂/MWh)", "https://www.iso-ne.com/static-assets/documents/100028/final-2024-air-emission-report.pdf"],
   fraun: ["Fraunhofer (2024), comparative LCA of Li-ion, Na-ion and solid-state cells", "https://publica.fraunhofer.de/handle/publica/480983"],
@@ -1113,7 +1130,7 @@ const ASSUMPTIONS = [
   ["Clean Peak certificates", `${P.cpsClear}% of the $65/MWh price (to 2032), $45 after`, "Sourced", ["cps", "modo"]],
   ["Installed cost", `$${P.sysCost}/kWh; replacements follow NLR's (formerly NREL) mid-case price decline`, "Assumed / sourced", ["inst", "nrel25"]],
   ["Fixed O&M", `${P.fom}% of installed cost a year (same for both systems, so it does not change the gain)`, "Sourced", ["atb"]],
-  ["Tax credit", `${P.itc}% through 2033, then 22.5%, 15%, 0`, "Sourced", ["itc"]],
+  ["Tax credit", `${P.itc}% federal investment credit for storage under 1 MW (26 U.S.C. § 48E); full rate if construction starts by 2033, then 22.5%, 15%, 0`, "Sourced", ["irc48e", "itc"]],
   ["Round-trip efficiency", `${P.rte}%`, "Assumed", []],
   ["Discount rate, horizon", `${P.discount}%, ${P.horizon} years`, "Assumed", []],
   ["Grid CO₂", `${P.gridCO2} lb/MWh (ISO-NE average; conservative for peak hours)`, "Sourced", ["isone"]],
@@ -1160,11 +1177,11 @@ function renderCustomer(cur) {
   const win = h.dNPV >= 0, gain = money(Math.abs(h.dNPV * n));
   const cmpRows = [
     grp(`Money over ${P.horizon} years`),
-    row("Net value to the owner", `Present value of everything the battery earns (ConnectedSolutions, demand-charge savings, Clean Peak certificates, from the energy it can actually deliver) minus purchases, replacements and O&M, discounted at ${P.discount}%. Average of ${P.packs} simulated batteries with identical cells in both designs.`, ["evs", "cs", "cps", "atb", "nrel25", "itc"],
-      V(h.fixed.npv, money(h.fixed.npv * n)), V(h.cell.npv, money(h.cell.npv * n)), "", `P10 ${money(h.dNPVp10 * n)} to P90 ${money(h.dNPVp90 * n)} for the difference`, sgn(h.dNPV * n, money), "hi", Math.sign(h.dNPV)),
-    row("Upfront price, after the 30% tax credit", `Installed cost $${P.sysCost}/kWh × ${kWh} kWh × (1 − ${P.itc}% ITC). REON assumed +${P.bmsOverhead}% for its cell-level BMS (REON: BMS is ~3× a conventional one, 2–3% of system cost). Price is REON's to set; see the break-even above.`, ["inst", "itc", "reon"],
-      V(upF, money(upF)), V(upC, money(upC)), "", `assumes +${P.bmsOverhead}% for the cell-level BMS`, sgn(upC - upF, money), "lo", -Math.sign(upC - upF)),
-    row("Payback", "Years until cumulative savings repay the purchase (median). Interconnection and aggregator fees are not included.", ["evs", "cs", "itc"],
+    row("Net value to the owner", `Present value of everything the battery earns (ConnectedSolutions, demand-charge savings, Clean Peak certificates, from the energy it can actually deliver) minus purchases, replacements and O&M, discounted at ${P.discount}%. Average of ${P.packs} simulated batteries with identical cells in both designs.`, ["evs", "cs", "cps", "atb", "nrel25", "irc48e", "itc"],
+      V(h.fixed.npv, money(h.fixed.npv * n)), V(h.cell.npv, money(h.cell.npv * n)), "", "", sgn(h.dNPV * n, money), "hi", Math.sign(h.dNPV)),
+    row("Upfront price, after the 30% tax credit", `Installed cost $${P.sysCost}/kWh × ${kWh} kWh × (1 − ${P.itc}% ITC). REON assumed +${P.bmsOverhead}% for its cell-level BMS (REON: BMS is ~3× a conventional one, 2–3% of system cost). `, ["inst", "irc48e", "itc", "reon"],
+      V(upF, money(upF)), V(upC, money(upC)), "", `includes REON's cell-level controls`, sgn(upC - upF, money), "lo", -Math.sign(upC - upF)),
+    row("Payback", "Years until cumulative savings repay the purchase (median). Interconnection and aggregator fees are not included.", ["evs", "cs", "irc48e", "itc"],
       V(isNaN(pbF) ? 99 : pbF, pTxt(pbF)), V(isNaN(pbC) ? 99 : pbC, pTxt(pbC)), "", "", isNaN(pbF) || isNaN(pbC) ? "–" : sgn(pbC - pbF, x => x.toFixed(1) + " y"), "lo", -Math.sign(pbC - pbF)),
     row(`Batteries bought over ${P.horizon} years`, `Including the first. When a battery wears out (below ${P.retire}% of nameplate) it is replaced at NLR's projected price for that year. Averages, so they can be fractional.`, ["nrel25"],
       V(h.fixed.blocks * n, (h.fixed.blocks * n).toFixed(1)), V(h.cell.blocks * n, (h.cell.blocks * n).toFixed(1)), "", "", sgn(h.cell.blocks * n - h.fixed.blocks * n, x => x.toFixed(1)), "lo", -Math.sign(h.cell.blocks - h.fixed.blocks)),
@@ -1175,10 +1192,10 @@ function renderCustomer(cur) {
       V(f.mwh, `${(f.mwh * n).toFixed(0)} MWh`), V(c.mwh, `${(c.mwh * n).toFixed(0)} MWh`), "", "", `${sgn(100 * (c.mwh / f.mwh - 1), x => x.toFixed(0))}%`, "hi", Math.sign(c.mwh - f.mwh)),
     row("Usable capacity at year 5", "Median usable energy at year 5 as a share of nameplate: how much of the battery the customer can actually use.", ["zhou"],
       V(retF, isFinite(retF) ? `${(100 * retF).toFixed(0)}%` : "–"), V(retC, isFinite(retC) ? `${(100 * retC).toFixed(0)}%` : "–"), "limited by the weakest cell", "each cell to its own limit", isFinite(retF) && isFinite(retC) ? `${sgn(100 * (retC - retF), x => x.toFixed(0))} pts` : "–", "hi", Math.sign(retC - retF)),
-    row("Round-trip efficiency", `Assumed, reduced for REON by the conduction loss of its per-cell switches. REON says the loss is minimal but not zero; a 1 mΩ switch would cost about 3% and erase the value.`, ["reon"],
-      V(P.rte, `${P.rte.toFixed(1)}%`), V(rteC, `${rteC.toFixed(1)}%`), "", `switches cost ${(100 - P.eff).toFixed(1)}%`, `${sgn(rteC - P.rte, x => x.toFixed(1))} pts`, "hi", Math.sign(rteC - P.rte)),
+    row("Round-trip efficiency", `Energy out per energy in. REON's per-cell switches cost a little energy (${(100 - P.eff).toFixed(1)}%).`, ["reon"],
+      V(P.rte, `${P.rte.toFixed(1)}%`), V(rteC, `${rteC.toFixed(1)}%`), "", "per-cell switches use a little energy", `${sgn(rteC - P.rte, x => x.toFixed(1))} pts`, "hi", Math.sign(rteC - P.rte)),
     grp("Reliability"),
-    row(fail ? "Chance one cell stops the battery in 10 years" : "Chance one cell stops the battery in 10 years (illustration; not in the base-case value)", `In a series string any one failed cell stops the battery: chance = 1 − (1 − rate)^(cells × 10 years), at ${ppmShown} ppm per cell-year (${P.N} cells). REON switches a failed cell out and needs service only after more than ${P.k} have failed. No public per-cell failure data exists, so the rate is an assumed range.`, ["epri", "recur"],
+    row("Chance one failed cell stops the battery in 10 years", `In a series string any one failed cell stops the battery: chance = 1 − (1 − rate)^(cells × 10 years), at ${ppmShown} ppm per cell-year (${P.N} cells). REON switches a failed cell out and needs service only after more than ${P.k} have failed.`, ["epri", "recur"],
       V(failF, `${(100 * failF).toFixed(0)}%`), V(failC, "≈ 0%"), `any of ${P.N} cells`, `${P.k} backup cells take over`, `${sgn(-100 * failF, x => x.toFixed(0))} pts`, "lo", 1),
     grp("Environment"),
     row(`Clean energy delivered over ${P.horizon} years`, `Energy each design delivers over the horizon, including replacements. Each extra MWh displaces ISO-NE average grid power at ${P.gridCO2} lb CO₂/MWh (peak hours are dirtier, so this is conservative).`, ["isone"],
@@ -1200,7 +1217,7 @@ function renderCustomer(cur) {
     tile("Energy delivered", "total over one battery's life", f.mwh * n, c.mwh * n, v => v.toFixed(0) + " MWh", "hi", `${sgn(100 * (c.mwh / f.mwh - 1), x => x.toFixed(0))}% usable energy`),
     tile("Payback", "years until savings repay the purchase", isNaN(pbF) ? 99 : pbF, isNaN(pbC) ? 99 : pbC, v => v >= 98 ? "n/a" : v.toFixed(1) + " y", "lo", isNaN(pbF) || isNaN(pbC) ? "–" : `${sgn(pbC - pbF, x => x.toFixed(1) + " y")} vs conventional`),
     tile(`Batteries bought in ${P.horizon} years`, "including replacements", h.fixed.blocks * n, h.cell.blocks * n, v => v.toFixed(1), "lo", `${sgn(h.cell.blocks * n - h.fixed.blocks * n, x => x.toFixed(1))} batteries`),
-    tile("Chance one cell stops the battery", fail ? `within 10 years, at ${ppmShown} failures per million cells a year` : `an illustration at ${ppmShown} failures per million cells a year; not counted in the base case`, failF, failC, v => v < 0.005 ? "≈ 0%" : (100 * v).toFixed(0) + "%", "lo", `${sgn(-100 * failF, x => x.toFixed(0))} points`),
+    tile("Chance one cell stops the battery", `within 10 years, if 1 in ${Math.round(1e6 / ppmShown).toLocaleString()} cells fails each year`, failF, failC, v => v < 0.005 ? "≈ 0%" : (100 * v).toFixed(0) + "%", "lo", `${sgn(-100 * failF, x => x.toFixed(0))} points`),
   ].join("");
   // usable energy over the battery's life (median); each line stops when that design's battery is replaced
   const retSvg = (() => {
@@ -1231,33 +1248,33 @@ function renderCustomer(cur) {
     <div><b>2 · What REON changes</b>REON senses and switches every cell. An empty cell steps aside while the rest keep going, and ${P.k} backup cells take over from any that fail.</div>
     <div><b>3 · What it is worth</b>More usable energy, a longer-lasting battery and no single-cell outages, turned into dollars and CO₂ for a real Massachusetts customer below.</div>
   </div>
-  <div class="setup"><b>How we sized one REON block</b><span class="pill">${P.N} cells in a string <i>(REON: 200–300)</i></span><span class="pill">${P.k} backup cells, ${Math.round(100 * P.k / P.N)}% <i>(REON's design)</i></span><span class="pill">${P.blockKWh} kWh · ${P.ratedKW} kW</span><span>Our picks inside REON's ranges, to be confirmed with REON.</span></div>
+  <div class="setup"><b>Inside one REON block</b><span class="pill">${P.N} cells</span><span class="pill">${P.k} spare cells that take over if one fails</span><span class="pill">${P.blockKWh} kWh · ${P.ratedKW} kW</span><span>Based on REON's design: 200–300 cells per string, about 10% spares.</span></div>
   <div class="card"><h2>What REON's cell-level control is worth to ${sel ? `a ${sel.name.toLowerCase()}` : "this site"}</h2>
     <p class="cap">${n} × REON EBS (${n * 30} kW / ${kWh} kWh) behind the meter in Massachusetts, ${tariffName(P.dcRate)}, from ${P.startYear}. Compared with the same cells in a conventional battery whose weakest cell limits the whole string. Pick a customer:</p>
     <div class="pick">${CUSTOMERS.map(x => `<button type="button" data-c="${x.id}" aria-pressed="${sel && sel.id === x.id}" title="${x.blurb}">${x.name}</button>`).join("")}</div>
     <p class="fine">${sel ? sel.blurb + "." : ""}</p>
     <h2 style="margin-top:16px">Which scenario?</h2>
     <div class="scen" role="radiogroup" aria-label="Scenario">
-      <button type="button" role="radio" data-sc="base" aria-checked="${!fail}"><span class="t">Base case</span><span class="d">Cells wear out at different speeds, as measured in real electric-vehicle batteries. No sudden cell failures. This is the number we can back with data.</span></button>
-      <button type="button" role="radio" data-sc="fail" aria-checked="${fail}"><span class="t">Cell failures included (upside case)</span><span class="d">Also assumes 1 in 1,000 cells fails each year (an assumption; no public data) and a conventional battery is replaced whenever one cell fails. In this scenario our model gives REON roughly 2× the energy and life, in the range of the 2–3× REON states. We don't know how REON measured theirs, so it is an upside, not a replication.</span></button>
+      <button type="button" role="radio" data-sc="base" aria-checked="${!fail}"><span class="t">Normal aging</span><span class="d">Cells wear out at slightly different speeds, as they do in every real battery. REON keeps the strong cells working instead of letting the weakest one set the limit.</span></button>
+      <button type="button" role="radio" data-sc="fail" aria-checked="${fail}"><span class="t">Aging plus cell failures</span><span class="d">Over the years, a few cells fail outright (about 1 in 1,000 a year). One failed cell stops a conventional battery and forces a replacement. REON switches the failed cell out and keeps running.</span></button>
     </div></div>
   <div class="verdict">
-    <div><div class="k">Recommendation for ${sel ? `a ${sel.name.toLowerCase()}` : "this site"} <span class="chip">${fail ? "Cell failures included" : "Base case"}</span></div>
+    <div><div class="k">Recommendation for ${sel ? `a ${sel.name.toLowerCase()}` : "this site"} <span class="chip">${fail ? "Aging plus cell failures" : "Normal aging"}</span></div>
       <div class="head">${win ? `REON comes out <b>${gain} ahead</b> over ${P.horizon} years.` : `A conventional battery comes out <b>${gain} ahead</b> at these assumptions.`}</div>
-      <div class="s">Net present value, REON minus conventional, for ${n} × 60 kWh blocks after REON's assumed +${P.bmsOverhead}% BMS cost. In 80% of simulated batteries the difference is between ${money(h.dNPVp10 * n)} and ${money(h.dNPVp90 * n)}.${info("Each design is simulated with the same cells; the difference is averaged over " + P.packs + " batteries. Open the Engineering view to change any assumption.")}</div></div>
+      <div class="s">Net value over ${P.horizon} years for ${n} REON block${n > 1 ? "s" : ""} (${n * P.ratedKW} kW / ${kWh} kWh), compared with a conventional battery built from the same cells, including purchase, replacements and running costs.${info("REON minus conventional, in today's dollars (discounted at " + P.discount + "% a year). Both batteries use identical cells and earn from the same Massachusetts programs. Every assumption and source is in the Engineering view.")}</div></div>
     <div><div class="k">What decides it</div><ul>
-      <li>You pay about <b>${money(Math.max(upC - upF, 0))} more up front</b> (after the 30% tax credit) for REON's cell-level control, and come out ahead by ${money(Math.abs(h.dNPV * n))} over ${P.horizon} years once replacements and running costs are counted.${info("Extra upfront cost = installed cost × " + P.bmsOverhead + "% for REON's cell-level BMS (REON: about 3× a conventional BMS, 2–3% of system cost), less the 30% tax credit. The 20-year net value already includes this extra cost and the cost of replacement batteries.")}</li>
-      <li>Battery life <b>${lifeF.toFixed(1)} → ${lifeC.toFixed(1)} y</b>, energy delivered <b>+${(100 * (c.mwh / f.mwh - 1)).toFixed(0)}%</b>, ${fail ? `and no outage from a single failed cell (conventional: <b>${(100 * failF).toFixed(0)}%</b> chance in 10 years)` : `and single-cell failures are covered by ${P.k} backup cells (choose “Cell failures included” above to price them in)`}.</li>
-      <li>Assumes REON's per-cell switches cost ${(100 - P.eff).toFixed(1)}% of round-trip energy (about ${(0.5 * (100 - P.eff) / 1.6).toFixed(2)} mΩ per switch at 100 A). At 1 mΩ (3.2%) the gain turns negative, so this is the number to confirm with REON.</li>
+      <li>You pay about <b>${money(Math.max(upC - upF, 0))} more up front</b> (after the 30% federal tax credit) for REON's cell-level control, and come out ahead by ${money(Math.abs(h.dNPV * n))} over ${P.horizon} years once replacements and running costs are counted.${info("Extra upfront cost = installed cost × " + P.bmsOverhead + "% for REON's cell-level BMS (REON: about 3× a conventional BMS, 2–3% of system cost), less the 30% tax credit. The 20-year net value already includes this extra cost and the cost of replacement batteries.")}</li>
+      <li>Your battery lasts <b>${lifeF.toFixed(1)} → ${lifeC.toFixed(1)} years</b> and delivers <b>+${(100 * (c.mwh / f.mwh - 1)).toFixed(0)}%</b> more energy over its life.</li>
+      <li>${fail ? `No outage from a single failed cell: a conventional battery has a <b>${(100 * failF).toFixed(0)}%</b> chance of one in 10 years.` : `${P.k} spare cells take over if a cell fails, so one bad cell never stops your battery.`}</li>
     </ul></div>
   </div>
   <div class="tiles">${tiles}</div>
   <div class="duo">
     <div class="card"><h2>How long each battery stays useful</h2>
-      <p class="cap">Usable energy as a share of rated energy. Each line ends when that battery has to be replaced${fail ? " (here, when its first cell fails)" : ""}. Median over ${P.packs} simulated batteries.</p>${retSvg}</div>
+      <p class="cap">Usable energy as a share of rated energy. Each line ends when that battery has to be replaced${fail ? " (here, the conventional battery is replaced at its first failed cell)" : ""}.</p>${retSvg}</div>
     <div class="card be"><h2>The trade: pay a little more now, come out ahead</h2>
       <p class="cap">What REON's cell-level control adds to the price, and what you get for it.</p>
-      <div class="trade"><div><div class="tl">Extra you pay up front</div><div class="tv cost">+${money(Math.max(upC - upF, 0))}</div><div class="tn">after the 30% tax credit</div></div><div class="arr">→</div><div><div class="tl">Ahead after ${P.horizon} years</div><div class="tv">${h.dNPV >= 0 ? "+" : "−"}${money(Math.abs(h.dNPV * n))}</div><div class="tn">net, after that extra cost and replacements</div></div></div>
+      <div class="trade"><div><div class="tl">Extra you pay up front</div><div class="tv cost">+${money(Math.max(upC - upF, 0))}</div><div class="tn">after the 30% federal tax credit (<a href="https://www.law.cornell.edu/uscode/text/26/48E">26 U.S.C. § 48E</a>)</div></div><div class="arr">→</div><div><div class="tl">Ahead after ${P.horizon} years</div><div class="tv">${h.dNPV >= 0 ? "+" : "−"}${money(Math.abs(h.dNPV * n))}</div><div class="tn">net, after that extra cost and replacements</div></div></div>
       <div class="trade-bars"><div class="tb"><span>Extra cost</span><i style="width:${(100 * Math.max(upC - upF, 0) / Math.max(upC - upF, Math.abs(h.dNPV * n), 1)).toFixed(1)}%;background:var(--fixed)"></i></div><div class="tb"><span>Net gain</span><i style="width:${(100 * Math.abs(h.dNPV * n) / Math.max(upC - upF, Math.abs(h.dNPV * n), 1)).toFixed(1)}%;background:${h.dNPV >= 0 ? "var(--cell)" : "var(--fault)"}"></i></div></div>
       <p class="fine" style="margin-top:12px">${upC > upF && h.dNPV > 0 ? `For every extra $1 you pay up front, about <b>${(h.dNPV * n / (upC - upF)).toFixed(h.dNPV * n / (upC - upF) >= 10 ? 0 : 1) === "" ? "" : "$" + (h.dNPV * n / (upC - upF)).toFixed(h.dNPV * n / (upC - upF) >= 10 ? 0 : 1)}</b> comes back as net gain over ${P.horizon} years.` : "At these assumptions the extra upfront cost is not recovered."}</p></div>
   </div>
@@ -1268,8 +1285,8 @@ function renderCustomer(cur) {
   <div class="card why"><h2>Why it pays</h2>
     <p>In a conventional battery every cell is wired in one line, so <b>the weakest cell decides how much energy the whole battery can give and when it must be replaced</b>, and <b>one failed cell stops all ${P.N}</b>. REON senses and switches each cell, so a cell that is empty steps aside while the others keep going, and ${P.k} backup cells take over from any that fail.</p>
     <p>For this customer that means more of the battery's energy is usable every day, the battery lasts longer before it needs replacing, and a single bad cell no longer means an outage. The money comes from Massachusetts demand-charge savings, ConnectedSolutions summer payments and Clean Peak certificates.</p>
-    <p class="fine">Model calibrated on real cell-to-cell aging data (Zhou et al., Nature Energy 2026); rates from Eversource's 2026 rate summary and Mass Save program materials; costs from NLR (formerly NREL); failure rates are an assumed range. Open the Engineering view to change any assumption.</p></div>
-  ${sourcesCard()}`;
+    <p class="fine">Built on real cell-aging data (Nature Energy, 2026), Eversource's 2026 rates, Mass Save's ConnectedSolutions program and Massachusetts Clean Peak certificates. Every assumption and source is listed below and in the Engineering view.</p></div>
+  <details class="srcfold"><summary>Assumptions and sources</summary>${sourcesCard()}</details>`;
   const es = document.getElementById("engSrc"); if (es) es.innerHTML = sourcesCard();
   const eh = document.getElementById("engHead"); if (eh) eh.innerHTML = `<b>Price headroom (for REON's pricing; not shown to customers).</b> At this site and scenario, REON's cell-level control still pays off if it costs up to <b>+${Math.max(beP, 0).toFixed(0)}%</b> more than a conventional battery; we assume +${P.bmsOverhead}%. It is the price at which the 20-year net value of the two designs is equal, so it depends on every assumption on this page, including the failure scenario.`;
   $("cview").querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", () => setCustomer(CUSTOMERS.find(x => x.id === b.dataset.c))));

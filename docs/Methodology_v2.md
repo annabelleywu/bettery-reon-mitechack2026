@@ -212,7 +212,7 @@ For each simulated pack and each year y of its service life, let E be the mean u
 ConnectedSolutions Daily Dispatch pays $200 per kW-summer on average kW held over 30–60 weekday events of 2–3 h, 2–7 pm, June–September, with a 5-year rate lock [S3]. We use 3-hour events (conservative).
 
 ```latex
-\text{DC}_y = 12 \times \$33.95/\text{kW-month} \times 0.75 \times \min\!\big(30\,\text{kW},\; E/2\,\text{h}\big) \times A
+\text{DC}_y = 12 \times \$33.95/\text{kW-month} \times 0.50 \times \min\!\big(30\,\text{kW},\; E/2\,\text{h}\big) \times A
 ```
 Eversource Greater Boston G-2: $20.21 distribution + $13.74 transmission per kW-month (Eversource's 2026 Summary of Eastern Massachusetts Electric Rates, effective Sep 1, 2026 [S22]; small businesses on G-1's demand option pay $41.65 and large ones on G-3 $30.05), billed on the monthly 15-minute peak [S7]. The 2-hour peak duration and 50% realization (75% as a sensitivity) are assumed; replace them with a ComStock load profile [S8].
 
@@ -237,7 +237,7 @@ Installed cost $600/kWh is assumed for this 2-hour system (installer data for sm
 
 **Who sells this.** REON's PitchBook profile (Sep 2026) describes it as a C&I energy platform: storage systems, microgrids, energy-management software, DER aggregation, optimisation and dispatch for virtual power plants, and financing [S21]. So REON can plausibly act as the ConnectedSolutions aggregator and finance the system itself. Confirm with REON which of these it offers in Massachusetts today.
 
-**Year-1 value per site** (fixed string): ConnectedSolutions $7.4k, demand charges $17.0k, Clean Peak $2.0k, losses −$1.1k; net $25.4k. Cell-level control is about 1% lower in year 1 (switch loss) and gains later through slower capacity loss and longer life.
+**Year-1 value per site** (fixed string): ConnectedSolutions $7.4k, demand charges $11.3k (at 50% capture), Clean Peak $2.0k, losses −$1.1k; net $19.7k before O&M (outputs/value_summary.md). Cell-level control is about 1% lower in year 1 (switch loss) and gains later through slower capacity loss and longer life.
 
 ---
 
