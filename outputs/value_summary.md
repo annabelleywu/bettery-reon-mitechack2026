@@ -20,9 +20,9 @@ Energy and life: means over packs. **Money is compared over a 20-year service ho
 | Year 1: ConnectedSolutions / demand charges / Clean Peak / losses | $7,416 / $11,329 / $2,013 / -$1,107 | $7,460 / $11,398 / $2,025 / -$1,114 |
 | Firm kW for 2 h at year 5 (per block) | 26.2 | 27.1 |
 
-Lifetime energy gain per block **+12.1%**, service life gain **+10.6%**. **20-year NPV gain: $4,336 per site** (P10 $1,958, P90 $6,656); over each design's own first life (no replacement) it is $6,566. Extra energy over 20 y: 11.7 MWh. CO2 avoided over 20 y: 3.2 t (operation) + 2.5 t (cells not manufactured). Cells kept out of waste: 221 kg (32 kWh). beta_power at start of life (fixed): 0.880 (paper fleet 0.871).
+Lifetime energy gain per block **+12.1%**, service life gain **+10.6%**. **20-year NPV gain: $4,336 per site** (P10 $1,958, P90 $6,656); over each design's own first life (no replacement) it is $6,566. Extra energy over 20 y: 11.7 MWh. CO2 avoided over 20 y: 3.2 t (operation, assuming charging from on-site solar) + 2.5 t (cells not manufactured). Cells kept out of waste: 221 kg (32 kWh). beta_power at start of life (fixed): 0.880 (paper fleet 0.871).
 
-**Scale-up, per 100 MW of C&I storage** (1,667 two-block sites; Massachusetts had about 220 MW enrolled in ConnectedSolutions in 2025): +$7.2M NPV, +19.4 GWh delivered and 9.5 kt CO2 avoided over 20 years, 368 t of cells not manufactured.
+**Scale-up, per 100 MW of C&I storage** (1,667 two-block sites; Massachusetts had about 220 MW enrolled in ConnectedSolutions in 2025): +$7.2M NPV, +19.4 GWh delivered and 9.5 kt CO2 avoided over 20 years (assuming charging from on-site solar), 368 t of cells not manufactured.
 
 ## Customers (same battery, different site)
 

@@ -47,6 +47,7 @@ class EconConfig:
     visit_cost: float = 1500.0           # $ per service visit to replace a failed cell or module (placeholder; $500-3,000)
     start_year: int = 2027
     grid_co2_lb_per_mwh: float = 597.0   # ISO-NE 2024 average emission rate
+    solar_charge_share: float = 1.0      # share of charging from on-site solar; operating-CO2 credit only (0 for a grid-only site)
     embodied_co2_kg_per_kwh: float = 80.0  # Fraunhofer 2024 LCA: sodium-ion 75-87 kg CO2e/kWh cell
     cell_kg_per_kwh: float = 7.0         # placeholder; ask REON
     horizon_years: int = 20              # years of storage service the owner needs
@@ -211,7 +212,7 @@ def site_value(results: dict, pack, econ: EconConfig = EconConfig()) -> dict:
     }
     summary["environment"] = {
         "life_fixed": life_f, "life_bypass": life_c,
-        "co2_operation_t": summary["delta"]["mwh_ac"] * econ.grid_co2_lb_per_mwh / LB_PER_T,
+        "co2_operation_t": summary["delta"]["mwh_ac"] * econ.grid_co2_lb_per_mwh * econ.solar_charge_share / LB_PER_T,
         "avoided_cell_kwh": avoided_kwh,
         "co2_cells_t": avoided_kwh * econ.embodied_co2_kg_per_kwh / 1000,
         "cells_kg": avoided_kwh * econ.cell_kg_per_kwh,

@@ -10,7 +10,7 @@ This document describes the full model behind the Cell Bypass Explorer web app (
 
 ## 0. Summary
 
-**Question.** For a Massachusetts commercial site with solar and a REON battery, how much more energy, service life, firm power and money does per-cell bypass deliver than a conventional fixed series string, after paying for REON's more expensive BMS?
+**Question.** For a Massachusetts commercial site with a REON battery (with or without on-site solar), how much more energy, service life, firm power and money does per-cell bypass deliver than a conventional fixed series string, after paying for REON's more expensive BMS?
 
 **System.** Two REON EBS blocks (each 30 kW / 60 kWh, sodium-ion; REON slides) = 60 kW / 120 kWh, at an Eversource Greater Boston G-2 site, from 2027. Each block is one string of **250 cells with about 10% (25) as backup cells**, as REON's CTO described it on Nov 7. Both designs use the same cells; the fixed string has no switches, so all 250 run in series and the weakest decides.
 
@@ -32,7 +32,7 @@ This document describes the full model behind the Cell Bypass Explorer web app (
 | 100 ppm per year | +$5.1k; 1.0 repair visits per site vs 0 | +$10.7k; +20.6% energy; 16% of fixed blocks lost early |
 | 1,000 ppm per year (Tim's 0.1% example) | +$12.5k; 9.9 visits per site vs 0 | **+$86.6k; +127% energy, +131% life (2.3×)**; the conventional site buys 6.6 blocks per position over 20 years against 3.0 |
 
-**By customer** (same battery; 20-year NPV gain per site): neighborhood grocer on Eversource G-1's demand option (2 blocks) **+$4.7k**; mid-size business on G-2 (2 blocks) +$4.3k; cold-storage warehouse on G-3 (10 blocks) **+$20.7k**; National Grid G-2 site +$3.5k.
+**By customer** (same battery; 20-year NPV gain per site): neighborhood grocer on Eversource G-1's demand option (2 blocks) **+$4.7k**; mid-size business on G-2 (2 blocks) +$4.3k; cold-storage warehouse on G-3 (10 blocks) **+$20.7k**; National Grid G-2 site +$3.5k (low case +$1.2k, high case +$5.8k), the closest model case to the illustrative New England Cold Storage site (no solar).
 
 **Scale-up:** per 100 MW of C&I storage (about 1,670 two-block sites), +$7.2M NPV, +19.4 GWh delivered, 9.5 kt CO₂ avoided and 368 t of cells not manufactured over 20 years. For context, Massachusetts had about 222 MW enrolled in ConnectedSolutions in 2025 [S28].
 
@@ -52,7 +52,7 @@ For slides: about **+12% energy and +11% life per battery, +$4k to +$5k per two-
 
 | Brief requirement | How we meet it |
 |---|---|
-| Specific real-world application | Massachusetts C&I solar + storage, 2 × REON EBS, Eversource G-2. REON's CTO asked for "depth over breadth" and "end customer first" (Discord). |
+| Specific real-world application | Massachusetts C&I battery storage (solar optional), 2 × REON EBS, Eversource G-2; an illustrative National Grid site (New England Cold Storage) is also shown. REON's CTO asked for "depth over breadth" and "end customer first" (Discord). |
 | Clear baseline | A fixed series string with passive balancing. The weakest cell ends every discharge; the pack retires when its energy falls below the threshold. The paper shows passive balancing holds SOC imbalance under 2% of capacity, so balancing is assumed to remove SOC imbalance but not capacity differences. |
 | Control case | The same cells, with REON's two given capabilities: per-cell monitoring (measured with noise) and selective bypass within a voltage-window limit k. |
 | Capacity recovery | Bypass on empty: usable charge Σ min(Qᵢ, Q₍ₖ₊₁₎) (Section 4). |
@@ -202,7 +202,7 @@ This assumes REON's BMS replaces the conventional one. Default 4%; show 4–6%.
 
 ## 8. Massachusetts C&I economics
 
-**Site.** 2 × REON EBS (60 kW / 120 kWh), Eversource Greater Boston rate G-2, first year 2027, solar on site. Two blocks clear the ≥50 kW size an aggregator lists for C&I ConnectedSolutions; the official program materials state no minimum [S3, S4].
+**Site.** 2 × REON EBS (60 kW / 120 kWh), Eversource Greater Boston rate G-2, first year 2027. No solar generation is modeled: the dollar results come from demand charges, ConnectedSolutions, Clean Peak and battery losses bought at the grid energy price, so they hold with or without solar. Two blocks clear the ≥50 kW size an aggregator lists for C&I ConnectedSolutions; the official program materials state no minimum [S3, S4].
 
 For each simulated pack and each year y of its service life, let E be the mean usable energy per discharge at the AC meter (× inverter efficiency 0.96, assumed) and A the availability. Per block:
 
@@ -243,7 +243,7 @@ Installed cost $600/kWh is assumed for this 2-hour system (installer data for sm
 
 ## 9. Environmental value
 
-- **Operational CO₂**: extra AC MWh delivered over life × 597 lb CO₂/MWh, the ISO-NE 2024 average emission rate [S15]. This assumes the battery charges from on-site solar and that delivered energy displaces average grid generation. Peak-hour marginal units emit more, so this is conservative.
+- **Operational CO₂**: extra AC MWh delivered over life × 597 lb CO₂/MWh, the ISO-NE 2024 average emission rate [S15]. The credit is multiplied by the share of battery charging that comes from on-site solar (setting "Share of battery charging from on-site solar"; default 100%, i.e. a solar-paired site). For a grid-only site such as NE Cold, set it to 0%: the operating credit is then zero and only the embodied CO₂ of cells not manufactured counts. Peak-hour marginal units emit more than the average, so the displaced-grid figure is conservative. The solar share does not change any dollar result.
 - **Cells not manufactured**: over a 20-year storage need, an owner buys 20 / life blocks of capacity. Avoided kWh = kWh × 20 × (1/life_fixed − 1/life_cell). Embodied CO₂ = avoided kWh × 80 kg CO₂e/kWh (Fraunhofer 2024 comparative LCA: sodium-ion 75–87, LFP 58–92 kg CO₂e per kWh of cell [S16]); replace with REON's lithium LCA when shared. Material = avoided kWh × 7 kg/kWh (assumed cell mass; ask REON).
 
 ---
@@ -374,7 +374,7 @@ Order of influence: hard-failure response, backup count and cell spread (largest
 4. **The stationary timeline is assumed** (calendar and cycle fade, knee at 6.6 years). Quote percentages, not years.
 5. **Simplified electrics.** Constant voltage, a count-based voltage window k, no thermal or UL limits.
 6. **Static temperatures**, which make temperature resting effectively permanent.
-7. **Economics are first-order**: no hourly dispatch optimization, demand-charge realization and peak duration are assumed, and ConnectedSolutions and Clean Peak are not stacked in the same hour. A ComStock load profile and PVWatts solar would replace the assumptions.
+7. **Economics are first-order**: no hourly dispatch optimization, demand-charge realization and peak duration are assumed, and ConnectedSolutions and Clean Peak are not stacked in the same hour. A ComStock load profile (and, for solar-paired sites, PVWatts solar) would replace the assumptions.
 8. **Rates change**: ConnectedSolutions has no published program year in the materials found; Clean Peak rules changed in May 2026.
 9. **Monte Carlo noise.** Python at 2,000 packs is the reference; the browser's 48-pack default reads about 1 point high.
 10. **Sensing model.** Resting depends on how accurately the BMS measures each cell's capacity; the two implementations differ here by about $0.4k (Section 11). REON's sensing accuracy is not yet known.

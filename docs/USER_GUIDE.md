@@ -30,6 +30,7 @@ The **Customer view** opens with these three panels:
 
 | Button | Site | Utility rate |
 |---|---|---|
+| NE Cold Storage (illustrative) | Independent frozen and refrigerated warehouse in Sturbridge, MA; 2 blocks; no solar on site. Tagged "Illustrative: inputs to be confirmed with NE Cold"; peak kW, monthly kWh, rate class and block count are placeholders | National Grid G-2, $15.06/kW (the closest model case) |
 | Neighborhood grocer | Refrigeration-heavy small business, 2 REON EBS blocks (60 kW / 120 kWh) | Eversource G-1 demand option, $41.65 per kW of monthly peak |
 | Mid-size business (default) | 2 blocks | Eversource G-2, $33.95/kW |
 | Cold-storage warehouse | Large site such as a regional cold store, 10 blocks | Eversource G-3, $30.05/kW |
@@ -54,7 +55,9 @@ The **Customer view** opens with these three panels:
 | Money over 20 years | Net value to the owner (present value of earnings minus purchases, replacements and O&M), upfront price after the 30% tax credit, payback, batteries bought over 20 years |
 | Battery performance | Service life (years and cycles to 70% of rated energy), energy delivered over one battery's life, usable capacity at year 5, round-trip efficiency |
 | Reliability | Chance one failed cell stops the battery in 10 years |
-| Environment | Clean energy delivered over 20 years, battery capacity used up (with its manufacturing CO₂ and cell mass), total CO₂ avoided with REON |
+| Environment | Energy delivered over 20 years, battery capacity used up (with its manufacturing CO₂ and cell mass), total CO₂ avoided with REON |
+
+**Solar is optional.** The dollar results do not depend on on-site solar (they come from demand charges, ConnectedSolutions, Clean Peak and battery losses). Solar affects only the operating-CO₂ credit, through the Engineering view setting **Share of battery charging from on-site solar**: 100% for a solar-paired site (the default), 0% for a grid-only site such as NE Cold, where only the CO₂ of cells not manufactured counts.
 
 REON is not better on every line: it costs a little more upfront and its switches lose a little energy. The table shows those trade-offs next to the gains so a customer can weigh them.
 
@@ -75,7 +78,7 @@ A short "How to read this view" note sits at the top. Then:
 ## 5. A two-minute tour
 
 1. Customer view, default site: about +12% energy and +11% life per battery, about +$4k per site over 20 years.
-2. Click **Cold-storage warehouse**: ten blocks, about five times the value.
+2. Click **NE Cold Storage (illustrative)** for the sales-meeting story: a National Grid site with no solar, about +$3.4k over 20 years in the dashboard (+$3.5k in the Python model). Then click **Cold-storage warehouse**: ten blocks, about five times the value of two.
 3. Choose **Aging plus cell failures**: the conventional battery's life roughly halves and REON's value jumps (in the range of REON's stated 2–3×; we do not claim to replicate their figure).
 4. Read the recommendation panel and the "The trade" card: a small extra upfront cost against the net gain after 20 years.
 5. Engineering view → move **Backup cells k** from 25 to 5, then to 125, and watch the gain shrink and grow.

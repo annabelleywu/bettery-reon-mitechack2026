@@ -216,7 +216,7 @@ const DEFAULTS = {
   // Massachusetts C&I application (Eversource Greater Boston G-2), see MA_Economics_Research.md
   nBlocks: 2, acEff: 96, rte: 88, csRate: 200, csHrs: 3, csEvents: 45, dcRate: 33.95, dcHrs: 2, dcRealize: 50,
   cpsClear: 87, cpsMult: 1.0, energyPrice: 0.20, itc: 30, discount: 8, startYear: 2027,
-  gridCO2: 597, embodiedCO2: 80, cellKgPerKWh: 7, horizon: 20, restTemp: 0, fom: 4,
+  gridCO2: 597, solarShare: 100, embodiedCO2: 80, cellKgPerKWh: 7, horizon: 20, restTemp: 0, fom: 4,
   bypassOnEmpty: true, bypassOnFault: true, isolateGap: 0, isoTemp: 0, isoRes: 0,
   restCount: 0, restRule: "life", restThresh: 20, restGap: 0, restStop: 85, spare: 1,
   spreadMult: 1, outlierFrac: 0, outlierKnee: 0.8,
@@ -663,7 +663,8 @@ const GROUPS = [
     { id: "itc", label: "Federal investment tax credit", min: 0, max: 40, step: 5, fmt: v => `${v}%`, note: "Storage keeps the ITC for projects starting construction by 2033, subject to FEOC sourcing rules (cell origin: ask REON)." },
     { id: "discount", label: "Discount rate", min: 3, max: 15, step: 0.5, fmt: v => `${v}%` },
     { id: "startYear", label: "First year of operation", min: 2026, max: 2030, step: 1, fmt: v => `${v}` },
-    { id: "gridCO2", label: "Grid CO₂ displaced by delivered energy", min: 200, max: 1200, step: 10, fmt: v => `${v} lb/MWh`, note: "ISO-NE 2024 average: 597 lb/MWh. Peak marginal units emit more, so this is conservative. Assumes the battery charges from on-site solar." },
+    { id: "gridCO2", label: "Grid CO₂ displaced by delivered energy", min: 200, max: 1200, step: 10, fmt: v => `${v} lb/MWh`, note: "ISO-NE 2024 average: 597 lb/MWh. Peak marginal units emit more, so this is conservative." },
+    { id: "solarShare", label: "Share of battery charging from on-site solar", min: 0, max: 100, step: 5, fmt: v => `${v}%`, note: "The operating-CO₂ credit counts only energy charged from solar or another zero-carbon source. 100% = solar-paired site (default). 0% = grid-only site such as NE Cold: only the cell-manufacturing CO₂ then counts. Does not change the dollar results." },
     { id: "embodiedCO2", label: "Embodied CO₂ of new cells", min: 30, max: 150, step: 1, fmt: v => `${v} kg/kWh`, note: "Fraunhofer comparative LCA (2025): sodium-ion 75–87, LFP 58–92 kg CO₂e/kWh cell. Replace with REON's LCA." },
     { id: "cellKgPerKWh", label: "Cell mass", min: 3, max: 15, step: 0.5, fmt: v => `${v} kg/kWh`, note: "Placeholder; ask REON for the EBS cell mass." },
     { id: "horizon", label: "Years of storage service the owner needs", min: 10, max: 30, step: 1, fmt: v => `${v} y`, note: "Money is compared over this horizon: retired blocks are replaced at that year's price (NREL 2025 mid-case decline) and ITC rate (30% through 2033, 22.5% in 2034, 15% in 2035, then 0)." },
@@ -843,7 +844,7 @@ function renderEcon(cur) {
   const yrs = v => v >= 98 ? "n/a" : `${v.toFixed(1)} y`;
   const lifeF = cur.fixed.life, lifeC = cur.cell.life, kWh = P.blockKWh * n;
   const avoidKWh = kWh * P.horizon * (1 / Math.max(lifeF, 0.1) - 1 / Math.max(lifeC, 0.1));
-  const opCO2 = e.dMWhAC * n * P.gridCO2 * 0.000453592; // t
+  const opCO2 = e.dMWhAC * n * P.gridCO2 * (P.solarShare / 100) * 0.000453592; // t
   const embCO2 = avoidKWh * P.embodiedCO2 / 1000;          // t
   const mass = avoidKWh * P.cellKgPerKWh;                    // kg
   const capPerF = (f.capex * n) / (f.mwhAC * n), capPerC = (c.capex * n) / (c.mwhAC * n);
@@ -870,7 +871,7 @@ function renderEcon(cur) {
     ${row("Simple payback (horizon)", hf.payback, hc.payback, yrs, "", true)}
     </tbody></table>
     <p class="econsum"><b>${P.horizon}-year NPV gain from cell-level control:</b> <span class="${h.dNPV > 0 ? "pos" : "neg"}">${money(h.dNPV * n)}</span> per site (P10 ${money(h.dNPVp10 * n)}, P90 ${money(h.dNPVp90 * n)}; paired, same cells) · over each design's own first life: ${money(e.dNPV * n)}
-    · <b>CO₂ avoided:</b> ${opCO2.toFixed(1)} t from extra delivered energy + ${embCO2.toFixed(1)} t of cell manufacturing avoided over ${P.horizon} y
+    · <b>CO₂ avoided:</b> ${opCO2.toFixed(1)} t from extra delivered energy (${P.solarShare}% solar-charged) + ${embCO2.toFixed(1)} t of cell manufacturing avoided over ${P.horizon} y
     · <b>Material kept out of waste:</b> ${(mass).toFixed(0)} kg of cells (${avoidKWh.toFixed(0)} kWh of replacement capacity not built)</p>`;
 }
 function polar(cx, cy, r, a) { return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
@@ -1023,9 +1024,11 @@ $("play").addEventListener("click", () => {
 // ---------------------------------------------------------------- customer view (a second tab; the engineering view is unchanged)
 function tariffName(r) { return Math.abs(r - 41.65) < 0.01 ? "Eversource G-1 demand option" : Math.abs(r - 33.95) < 0.01 ? "Eversource G-2" : Math.abs(r - 30.05) < 0.01 ? "Eversource G-3" : Math.abs(r - 15.06) < 0.01 ? "National Grid G-2" : `$${r.toFixed(2)}/kW demand charge`; }
 const CUSTOMERS = [
-  { id: "grocer", name: "Neighborhood grocer", blurb: "Refrigeration-heavy small business, Eversource G-1 demand option ($41.65/kW), 2 blocks", set: { dcRate: 41.65, nBlocks: 2 } },
-  { id: "mid", name: "Mid-size business", blurb: "Eversource G-2 ($33.95/kW), 2 blocks", set: { dcRate: 33.95, nBlocks: 2 } },
-  { id: "cold", name: "Cold-storage warehouse", blurb: "Large site such as a regional cold store, Eversource G-3 ($30.05/kW), 10 blocks", set: { dcRate: 30.05, nBlocks: 10 } },
+  { id: "necold", name: "NE Cold Storage (illustrative)", who: "New England Cold Storage (illustrative)", blurb: "Independent frozen and refrigerated warehouse in Sturbridge, MA on National Grid (G-2 demand charge, $15.06/kW), 2 blocks, no solar on site", set: { dcRate: 15.06, nBlocks: 2, solarShare: 0 },
+    note: "Illustrative: inputs to be confirmed with NE Cold. Known: Sturbridge, MA · National Grid · frozen and refrigerated storage · no solar on site. Placeholders until NE Cold shares its bills: peak kW, monthly kWh, rate class, number of blocks (the model case uses National Grid G-2 and 2 blocks)." },
+  { id: "grocer", name: "Neighborhood grocer", blurb: "Refrigeration-heavy small business, Eversource G-1 demand option ($41.65/kW), 2 blocks", set: { dcRate: 41.65, nBlocks: 2, solarShare: 100 } },
+  { id: "mid", name: "Mid-size business", blurb: "Eversource G-2 ($33.95/kW), 2 blocks", set: { dcRate: 33.95, nBlocks: 2, solarShare: 100 } },
+  { id: "cold", name: "Cold-storage warehouse", blurb: "Large site such as a regional cold store, Eversource G-3 ($30.05/kW), 10 blocks", set: { dcRate: 30.05, nBlocks: 10, solarShare: 100 } },
 ];
 (function buildTabs() {
   const st = document.createElement("style");
@@ -1059,6 +1062,7 @@ const CUSTOMERS = [
   .cv .card h2{font-size:21px;font-weight:500;margin-bottom:6px}
   .story div{font-size:15.5px}.story b{font-size:16px}
   .cv .pick button{font-size:15px;padding:9px 18px}
+  .cv .illus{margin:8px 0 0;padding:10px 14px;border:1px solid #D9661F;border-radius:12px;font-size:14px;line-height:1.45;color:var(--ink)}
   .scen{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}@media(max-width:800px){.scen{grid-template-columns:1fr}}
   .scen button{display:flex;flex-direction:column;gap:4px;text-align:left;border-radius:16px;padding:14px 18px;border:1.5px solid var(--rule);background:var(--panel);color:var(--ink)}
   .scen button .t{font-size:17px;font-weight:600}.scen button .d{font-size:14px;line-height:1.45;color:var(--muted)}
@@ -1134,6 +1138,7 @@ const ASSUMPTIONS = [
   ["Round-trip efficiency", `${P.rte}%`, "Assumed", []],
   ["Discount rate, horizon", `${P.discount}%, ${P.horizon} years`, "Assumed", []],
   ["Grid CO₂", `${P.gridCO2} lb/MWh (ISO-NE average; conservative for peak hours)`, "Sourced", ["isone"]],
+  ["Solar charging share", `${P.solarShare}% of charging from on-site solar (operating-CO₂ credit only; dollars do not depend on it)`, "Assumed", []],
   ["Cell manufacturing CO₂", `${P.embodiedCO2} kg CO₂e per kWh of cells (sodium-ion 75–87)`, "Sourced", ["fraun"]],
   ["Cell failure rate", P.faultPPM ? `${P.faultPPM} ppm per cell-year` : "Off (aging only); 10–1,000 ppm tested", "Assumed range (no public field data)", ["epri", "recur"]],
 ];
@@ -1149,13 +1154,14 @@ function setCustomer(c) { Object.assign(P, c.set); buildControls(); changed(); }
 function renderCustomer(cur) {
   const n = P.nBlocks, h = cur.horizon, f = cur.fixed, c = cur.cell, kWh = P.blockKWh * n;
   const sel = CUSTOMERS.find(x => Math.abs(x.set.dcRate - P.dcRate) < 0.01 && x.set.nBlocks === n);
+  const who = sel ? (sel.who || `a ${sel.name.toLowerCase()}`) : "this site";
   const fail = P.faultPPM > 0, k5 = 60;
   const r10 = ppm => 1 - Math.pow(1 - ppm * 1e-6, P.N * 10);
   const ppmShown = fail ? P.faultPPM : 100;
   const retF = cur.fixed.p50 ? cur.fixed.p50[k5] : NaN, retC = cur.cell.p50 ? cur.cell.p50[k5] : NaN;
   const lifeF = f.life, lifeC = c.life, cycF = lifeF * P.cpy, cycC = lifeC * P.cpy;
   const avoidKWh = kWh * P.horizon * (1 / Math.max(lifeF, 0.1) - 1 / Math.max(lifeC, 0.1));
-  const co2 = (h.cell.mwh - h.fixed.mwh) * n * P.gridCO2 * 0.000453592 + avoidKWh * P.embodiedCO2 / 1000;
+  const co2 = (h.cell.mwh - h.fixed.mwh) * n * P.gridCO2 * (P.solarShare / 100) * 0.000453592 + avoidKWh * P.embodiedCO2 / 1000;
   const rteC = P.rte * P.eff / 100;
   const info = how => how ? ` <span class="info" tabindex="0" role="note" aria-label="${how.replace(/"/g, "&quot;")}" data-tip="${how.replace(/"/g, "&quot;")}">ⓘ</span>` : "";
   // one comparison row: criterion | conventional | REON | difference. better: "hi" (higher wins), "lo" (lower wins) or "" (no winner)
@@ -1198,11 +1204,11 @@ function renderCustomer(cur) {
     row("Chance one failed cell stops the battery in 10 years", `In a series string any one failed cell stops the battery: chance = 1 − (1 − rate)^(cells × 10 years), at ${ppmShown} ppm per cell-year (${P.N} cells). REON switches a failed cell out and needs service only after more than ${P.k} have failed.`, ["epri", "recur"],
       V(failF, `${(100 * failF).toFixed(0)}%`), V(failC, "≈ 0%"), `any of ${P.N} cells`, `${P.k} backup cells take over`, `${sgn(-100 * failF, x => x.toFixed(0))} pts`, "lo", 1),
     grp("Environment"),
-    row(`Clean energy delivered over ${P.horizon} years`, `Energy each design delivers over the horizon, including replacements. Each extra MWh displaces ISO-NE average grid power at ${P.gridCO2} lb CO₂/MWh (peak hours are dirtier, so this is conservative).`, ["isone"],
+    row(`Energy delivered over ${P.horizon} years`, `Energy each design delivers over the horizon, including replacements. The operating-CO₂ credit counts only the ${P.solarShare}% of charging that comes from on-site solar: each such extra MWh displaces ISO-NE average grid power at ${P.gridCO2} lb CO₂/MWh (peak hours are dirtier, so this is conservative).`, ["isone"],
       V(h.fixed.mwh, `${(h.fixed.mwh * n).toFixed(0)} MWh`), V(h.cell.mwh, `${(h.cell.mwh * n).toFixed(0)} MWh`), "", "", sgn((h.cell.mwh - h.fixed.mwh) * n, x => x.toFixed(0) + " MWh"), "hi", Math.sign(h.cell.mwh - h.fixed.mwh)),
     row(`Battery capacity used up over ${P.horizon} years`, `${kWh} kWh × ${P.horizon} years ÷ service life. Each kWh of cells carries ${P.embodiedCO2} kg CO₂e to make (sodium-ion LCA) and about ${P.cellKgPerKWh} kg of cell material (assumed).`, ["fraun"],
       V(usedF, `${usedF.toFixed(0)} kWh`), V(usedC, `${usedC.toFixed(0)} kWh`), `${(usedF * P.embodiedCO2 / 1000).toFixed(1)} t CO₂e · ${(usedF * P.cellKgPerKWh).toFixed(0)} kg cells`, `${(usedC * P.embodiedCO2 / 1000).toFixed(1)} t CO₂e · ${(usedC * P.cellKgPerKWh).toFixed(0)} kg cells`, sgn(usedC - usedF, x => x.toFixed(0) + " kWh"), "lo", -Math.sign(usedC - usedF)),
-    `<tr><td class="c"><b>Total CO₂ avoided with REON</b>${info("Extra clean energy delivered × grid intensity, plus the embodied CO₂ of battery capacity not manufactured.")}</td><td class="v">–</td><td class="v win">${co2.toFixed(1)} t</td><td class="d ${co2 >= 0 ? "pos" : "neg"}">${sgn(co2, x => x.toFixed(1) + " t")}</td></tr>`,
+    `<tr><td class="c"><b>Total CO₂ avoided with REON</b>${info(`Extra energy delivered × share charged from solar (${P.solarShare}%) × grid intensity, plus the embodied CO₂ of battery capacity not manufactured.`)}</td><td class="v">–</td><td class="v win">${co2.toFixed(1)} t</td><td class="d ${co2 >= 0 ? "pos" : "neg"}">${sgn(co2, x => x.toFixed(1) + " t")}</td></tr>`,
   ].join("");
   const tile = (title, sub, fv, cv, fmt, better, delta) => {
     const mx = Math.max(Math.abs(fv), Math.abs(cv), 1e-9), w = v => v > 0 ? Math.max(3, 100 * v / mx) : 1.5, good = better === "hi" ? cv > fv : cv < fv;
@@ -1249,17 +1255,18 @@ function renderCustomer(cur) {
     <div><b>3 · What it is worth</b>More usable energy, a longer-lasting battery and no single-cell outages, turned into dollars and CO₂ for a real Massachusetts customer below.</div>
   </div>
   <div class="setup"><b>Inside one REON block</b><span class="pill">${P.N} cells</span><span class="pill">${P.k} spare cells that take over if one fails</span><span class="pill">${P.blockKWh} kWh · ${P.ratedKW} kW</span><span>Based on REON's design: 200–300 cells per string, about 10% spares.</span></div>
-  <div class="card"><h2>What REON's cell-level control is worth to ${sel ? `a ${sel.name.toLowerCase()}` : "this site"}</h2>
+  <div class="card"><h2>What REON's cell-level control is worth to ${who}</h2>
     <p class="cap">${n} × REON EBS (${n * 30} kW / ${kWh} kWh) behind the meter in Massachusetts, ${tariffName(P.dcRate)}, from ${P.startYear}. Compared with the same cells in a conventional battery whose weakest cell limits the whole string. Pick a customer:</p>
     <div class="pick">${CUSTOMERS.map(x => `<button type="button" data-c="${x.id}" aria-pressed="${sel && sel.id === x.id}" title="${x.blurb}">${x.name}</button>`).join("")}</div>
     <p class="fine">${sel ? sel.blurb + "." : ""}</p>
+    ${sel && sel.note ? `<p class="illus">${sel.note}</p>` : ""}
     <h2 style="margin-top:16px">Which scenario?</h2>
     <div class="scen" role="radiogroup" aria-label="Scenario">
       <button type="button" role="radio" data-sc="base" aria-checked="${!fail}"><span class="t">Normal aging</span><span class="d">Cells wear out at slightly different speeds, as they do in every real battery. REON keeps the strong cells working instead of letting the weakest one set the limit.</span></button>
       <button type="button" role="radio" data-sc="fail" aria-checked="${fail}"><span class="t">Aging plus cell failures</span><span class="d">Over the years, a few cells fail outright (about 1 in 1,000 a year). One failed cell stops a conventional battery and forces a replacement. REON switches the failed cell out and keeps running.</span></button>
     </div></div>
   <div class="verdict">
-    <div><div class="k">Recommendation for ${sel ? `a ${sel.name.toLowerCase()}` : "this site"} <span class="chip">${fail ? "Aging plus cell failures" : "Normal aging"}</span></div>
+    <div><div class="k">Recommendation for ${who} <span class="chip">${fail ? "Aging plus cell failures" : "Normal aging"}</span></div>
       <div class="head">${win ? `REON comes out <b>${gain} ahead</b> over ${P.horizon} years.` : `A conventional battery comes out <b>${gain} ahead</b> at these assumptions.`}</div>
       <div class="s">Net value over ${P.horizon} years for ${n} REON block${n > 1 ? "s" : ""} (${n * P.ratedKW} kW / ${kWh} kWh), compared with a conventional battery built from the same cells, including purchase, replacements and running costs.${info("REON minus conventional, in today's dollars (discounted at " + P.discount + "% a year). Both batteries use identical cells and earn from the same Massachusetts programs. Every assumption and source is in the Engineering view.")}</div></div>
     <div><div class="k">What decides it</div><ul>

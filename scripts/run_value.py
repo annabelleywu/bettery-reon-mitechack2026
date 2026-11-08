@@ -199,14 +199,14 @@ def main():
         f"**20-year NPV gain: ${hz['npv_gain_mean']:,.0f} per site** (P10 ${hz['npv_gain_p10']:,.0f}, P90 "
         f"${hz['npv_gain_p90']:,.0f}); over each design's own first life (no replacement) it is "
         f"${v['delta']['npv_p50']:,.0f}. Extra energy over 20 y: {d_mwh20:.1f} MWh. CO2 avoided over 20 y: "
-        f"{d_mwh20 * ec.grid_co2_lb_per_mwh / 2204.62:.1f} t (operation) + {env['co2_cells_t']:.1f} t (cells not "
+        f"{d_mwh20 * ec.grid_co2_lb_per_mwh * ec.solar_charge_share / 2204.62:.1f} t (operation, assuming charging from on-site solar) + {env['co2_cells_t']:.1f} t (cells not "
         f"manufactured). Cells kept out of waste: {env['cells_kg']:.0f} kg ({env['avoided_cell_kwh']:.0f} kWh). "
         f"beta_power at start of life (fixed): {base['bpow0']:.3f} (paper fleet 0.871).",
         "",
         f"**Scale-up, per 100 MW of C&I storage** ({per100:,.0f} two-block sites; Massachusetts had about 220 MW enrolled "
         f"in ConnectedSolutions in 2025): +${hz['npv_gain_mean'] * per100 / 1e6:.1f}M NPV, "
         f"+{d_mwh20 * per100 / 1000:.1f} GWh delivered and "
-        f"{(d_mwh20 * ec.grid_co2_lb_per_mwh / 2204.62 + env['co2_cells_t']) * per100 / 1000:.1f} kt CO2 avoided over 20 years, "
+        f"{(d_mwh20 * ec.grid_co2_lb_per_mwh * ec.solar_charge_share / 2204.62 + env['co2_cells_t']) * per100 / 1000:.1f} kt CO2 avoided over 20 years (assuming charging from on-site solar), "
         f"{env['cells_kg'] * per100 / 1000:.0f} t of cells not manufactured.",
         "",
         "## Customers (same battery, different site)",
