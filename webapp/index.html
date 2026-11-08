@@ -1007,6 +1007,7 @@ function recompute() {
   renderTime();
   renderEcon(CUR);
   renderCustomer(CUR);
+  computeAlt();
   $("status").textContent = "";
   runSweeps(++sweepToken);
 }
@@ -1025,7 +1026,7 @@ $("play").addEventListener("click", () => {
 function tariffName(r) { return Math.abs(r - 41.65) < 0.01 ? "Eversource G-1 demand option" : Math.abs(r - 33.95) < 0.01 ? "Eversource G-2" : Math.abs(r - 30.05) < 0.01 ? "Eversource G-3" : Math.abs(r - 15.06) < 0.01 ? "National Grid G-2" : `$${r.toFixed(2)}/kW demand charge`; }
 const CUSTOMERS = [
   { id: "necold", name: "NE Cold Storage", who: "New England Cold Storage", blurb: "Public frozen and refrigerated warehouse in Sturbridge, MA: about 120,000 sq ft (95,000 sq ft frozen), 25,000 pallet positions, six ALTA EXPERT refrigeration systems. Modeled on National Grid G-2 ($15.06/kW) with 2 blocks", set: { dcRate: 15.06, nBlocks: 2, solarShare: 0 },
-    note: `Site facts from <a href="https://www.necold.com/the-building/">necold.com</a>, <a href="https://arcodb.com/projects/new-england-cold-storage/">ARCO Design/Build</a> and the <a href="https://www.sturbridge.gov/planning-board/webforms/special-permit-site-plan-review-new-england-cold-storage-6-picker-road">Town of Sturbridge</a>. Peak kW, monthly kWh and rate class are not public, so this uses the closest model case (National Grid G-2, 2 blocks); NE Cold's own bills would replace it. These results do not include solar, and the dollar results do not depend on it.` },
+    note: `Site facts from <a href="https://www.necold.com/the-building/">necold.com</a>, <a href="https://arcodb.com/projects/new-england-cold-storage/">ARCO Design/Build</a> and the <a href="https://www.sturbridge.gov/planning-board/webforms/special-permit-site-plan-review-new-england-cold-storage-6-picker-road">Town of Sturbridge</a>. Savings use a typical National Grid commercial rate and 2 blocks; NE Cold's own bills would sharpen them.` },
   { id: "grocer", name: "Neighborhood grocer", blurb: "Refrigeration-heavy small business, Eversource G-1 demand option ($41.65/kW), 2 blocks", set: { dcRate: 41.65, nBlocks: 2, solarShare: 100 } },
   { id: "mid", name: "Mid-size business", blurb: "Eversource G-2 ($33.95/kW), 2 blocks", set: { dcRate: 33.95, nBlocks: 2, solarShare: 100 } },
   { id: "cold", name: "Cold-storage warehouse", blurb: "Large site such as a regional cold store, Eversource G-3 ($30.05/kW), 10 blocks", set: { dcRate: 30.05, nBlocks: 10, solarShare: 100 } },
@@ -1275,6 +1276,7 @@ function renderCustomer(cur) {
       <li>${fail ? `No outage from a single failed cell: a conventional battery has a <b>${(100 * failF).toFixed(0)}%</b> chance of one in 10 years.` : `${P.k} spare cells take over if a cell fails, so one bad cell never stops your battery.`}</li>
     </ul></div>
   </div>
+  <div class="card"><h2>What to expect: a range</h2><p class="cap">The same site under two assumptions about how the cells behave.</p><div class="range" id="rangeBody"></div></div>
   <div class="tiles">${tiles}</div>
   <div class="duo">
     <div class="card"><h2>How long each battery stays useful</h2>
@@ -1291,9 +1293,10 @@ function renderCustomer(cur) {
     <tbody>${cmpRows}</tbody></table></div></div>
   <div class="card why"><h2>Why it pays</h2>
     <p>In a conventional battery every cell is wired in one line, so <b>the weakest cell decides how much energy the whole battery can give and when it must be replaced</b>, and <b>one failed cell stops all ${P.N}</b>. REON senses and switches each cell, so a cell that is empty steps aside while the others keep going, and ${P.k} backup cells take over from any that fail.</p>
-    <p>For this customer that means more of the battery's energy is usable every day, the battery lasts longer before it needs replacing, and a single bad cell no longer means an outage. The money comes from Massachusetts demand-charge savings, ConnectedSolutions summer payments and Clean Peak certificates.</p>
+    <p>For this customer that means more of the battery's energy is usable every day, the battery lasts longer before it needs replacing, and a single bad cell no longer means an outage. The money comes from Massachusetts demand-charge savings, ConnectedSolutions summer payments and Clean Peak certificates. In its first year this battery earns about <b>${money(cur.econ.cell.net * n)}</b>: ${money(cur.econ.cell.dc * n)} in demand charges avoided, ${money(cur.econ.cell.cs * n)} from ConnectedSolutions, ${money(cur.econ.cell.cps * n)} from Clean Peak, less ${money(cur.econ.cell.loss * n)} in battery losses.</p>
     <p class="fine">Built on real cell-aging data (Nature Energy, 2026), Eversource's 2026 rates, Mass Save's ConnectedSolutions program and Massachusetts Clean Peak certificates. Every assumption and source is listed below and in the Engineering view.</p></div>
   <details class="srcfold"><summary>Assumptions and sources</summary>${sourcesCard()}</details>`;
+  updateRange();
   const es = document.getElementById("engSrc"); if (es) es.innerHTML = sourcesCard();
   const eh = document.getElementById("engHead"); if (eh) eh.innerHTML = `<b>Price headroom (for REON's pricing; not shown to customers).</b> At this site and scenario, REON's cell-level control still pays off if it costs up to <b>+${Math.max(beP, 0).toFixed(0)}%</b> more than a conventional battery; we assume +${P.bmsOverhead}%. It is the price at which the 20-year net value of the two designs is equal, so it depends on every assumption on this page, including the failure scenario.`;
   $("cview").querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", () => setCustomer(CUSTOMERS.find(x => x.id === b.dataset.c))));
@@ -1316,6 +1319,32 @@ function renderCustomer(cur) {
   document.addEventListener("click", e => { const t = hit(e); if (t) { cur === t ? hide() : show(t); } else hide(); });
   window.addEventListener("scroll", hide, { passive: true });
 })();
+
+// ---------------------------------------------------------------- range card: the other scenario, computed alongside
+let ALT = null, altToken = 0;
+(function rangeStyle() {
+  const st = document.createElement("style");
+  st.textContent = `.cv .range{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}@media(max-width:900px){.cv .range{grid-template-columns:1fr}}
+  .cv .range>div{border:1px solid var(--rule);border-radius:12px;padding:12px 14px}.cv .range .t{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.cv .range .v{font-size:30px;font-weight:400;color:var(--cell);margin:4px 0}.cv .range p{margin:0;font-size:14px;line-height:1.45;color:var(--muted)}`;
+  document.head.appendChild(st);
+})();
+function computeAlt() {
+  const tok = ++altToken; ALT = null; updateRange();
+  setTimeout(() => {
+    if (tok !== altToken) return;
+    const fail = P.faultPPM > 0, q = Object.assign(clone(P), fail ? { faultPPM: 0, onFault: "repair" } : { faultPPM: 1000, onFault: "retire" });
+    const r = runAll(q, P.packs, false);
+    if (tok !== altToken) return;
+    ALT = r.horizon.dNPV * P.nBlocks; updateRange();
+  }, 30);
+}
+function updateRange() {
+  const el = document.getElementById("rangeBody"); if (!el || !CUR) return;
+  const mine = CUR.horizon.dNPV * P.nBlocks, fail = P.faultPPM > 0;
+  const base = fail ? ALT : mine, up = fail ? mine : ALT, fmt = v => v == null ? "…" : `${v >= 0 ? "+" : "−"}${money(Math.abs(v)).replace("−", "")}`;
+  el.innerHTML = `<div><div class="t">Normal aging</div><div class="v">${fmt(base)}</div><p>Cells wear out at slightly different speeds, as in any real battery. No cell fails outright.</p></div>
+    <div><div class="t">Aging plus cell failures</div><div class="v">${fmt(up)}</div><p>If about 1 in 1,000 cells fails each year, one failure stops a conventional battery and it is replaced. That failure rate is our assumption; REON's field data would replace it.</p></div>`;
+}
 
 buildControls();
 setTimeout(() => { DEF = runAll(clone(DEFAULTS), DEFAULTS.packs, true); recompute(); }, 0);

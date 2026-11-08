@@ -57,6 +57,8 @@ The **Customer view** opens with these three panels:
 | Reliability | Chance one failed cell stops the battery in 10 years |
 | Environment | Energy delivered over 20 years, battery capacity used up (with its manufacturing CO₂ and cell mass), total CO₂ avoided with REON |
 
+**Range card.** Under the recommendation, "What to expect: a range" shows the same site under both scenarios at once: normal aging (the base case) and aging plus cell failures (the upper end, which rests on an assumed failure rate of about 1 in 1,000 cells a year). The dashboard computes the other scenario in the background after each change.
+
 **Solar is optional.** The dollar results do not depend on on-site solar (they come from demand charges, ConnectedSolutions, Clean Peak and battery losses). Solar affects only the operating-CO₂ credit, through the Engineering view setting **Share of battery charging from on-site solar**: 100% for a solar-paired site (the default), 0% for a grid-only site such as NE Cold, where only the CO₂ of cells not manufactured counts.
 
 REON is not better on every line: it costs a little more upfront and its switches lose a little energy. The table shows those trade-offs next to the gains so a customer can weigh them.
