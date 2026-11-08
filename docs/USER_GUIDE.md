@@ -34,12 +34,18 @@ The **Customer view** opens with these three panels:
 | Mid-size business (default) | 2 blocks | Eversource G-2, $33.95/kW |
 | Cold-storage warehouse | Large site such as a regional cold store, 10 blocks | Eversource G-3, $30.05/kW |
 
-**Include cell failures (REON's 2–3× case)** switches on random cell failures (0.1% per cell per year). A conventional battery is then replaced at its first failure, because one failed cell stops it. Turn it on to see where REON's 2–3× claim comes from; turn it off for aging alone.
+**Which scenario?** Two cards decide what the numbers assume:
+- **Base case** (default): cells wear out at different speeds, as measured in real electric-vehicle batteries, and no cell fails suddenly. This is the number we can back with data.
+- **Cell failures included (REON's upside case):** also assumes 1 in 1,000 cells fails each year (an assumption; no public data) and a conventional battery is replaced whenever one cell fails. This is where REON's "2–3×" comes from, so treat it as an upside, not the expectation. The recommendation panel shows a "Base case" or "Cell failures included" tag so it is always clear which one you are looking at.
 
 **The recommendation panel** (dark green) answers the customer's question in one line: which option comes out ahead over 20 years, and by how much (with the range across simulated batteries). Beside it, **What decides it** lists:
 - **Break-even price premium.** The highest extra price REON's system can carry and still pay off for this customer (about 9% for the default site, against 4% assumed). This is also a pricing guide for REON.
 - **The physical gains.** Battery life, energy delivered and single-cell failure protection.
 - **The main risk.** Per-cell switch losses: at 1 mΩ per switch the gain turns negative, so this is the number to confirm with REON.
+
+**Six at-a-glance tiles.** Paired bars for net value, battery life, energy delivered, payback, batteries bought and the chance one cell stops the battery; green text marks where REON is better, red where it is not.
+
+**Two charts.** A line chart of usable energy over time (each line ends when that battery is replaced) and a bar showing how much more REON could cost and still pay off.
 
 **Side-by-side table.** One column for a conventional battery and one for REON with the same cells, site and tariff, plus a difference column. A ✓ marks the better option on each line. Hover over **ⓘ** to see how a line is calculated; the links under each line go to its sources.
 
@@ -70,7 +76,7 @@ A short "How to read this view" note sits at the top. Then:
 
 1. Customer view, default site: about +12% energy and +11% life per battery, about +$4k per site over 20 years.
 2. Click **Cold-storage warehouse**: ten blocks, about five times the value.
-3. Click **Include cell failures**: the conventional battery's life roughly halves and REON's value jumps (REON's 2–3× claim).
+3. Choose **Cell failures included**: the conventional battery's life roughly halves and REON's value jumps (REON's 2–3× claim).
 4. Read the recommendation panel: the break-even price premium shows how much more REON can charge and still pay off.
 5. Engineering view → move **Backup cells k** from 25 to 5, then to 125, and watch the gain shrink and grow.
 6. Move **Cell-to-cell spread, multiple of the calibrated spread** (under Cell aging) to 2×: more uneven cells make REON worth more.

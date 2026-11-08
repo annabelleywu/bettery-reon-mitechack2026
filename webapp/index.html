@@ -29,13 +29,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0a1a11; --panel: #11251a; --ink: #f5f7f3; --muted: #a9b5ac; --rule: rgba(245, 247, 243, 0.14);
-    --fixed: #9aa39c; --cell: #3fe05a; --accent: #00d000; --cell-soft: #183324; --stranded: #2c4034;
+    --fixed: #9aa39c; --cell: #2fc24c; --accent: #00d000; --cell-soft: #183324; --stranded: #2c4034;
     --rest: #e3a73a; --fault: #ef6b55; --good: #3fe05a; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0a1a11; --panel: #11251a; --ink: #f5f7f3; --muted: #a9b5ac; --rule: rgba(245, 247, 243, 0.14);
-  --fixed: #9aa39c; --cell: #3fe05a; --accent: #00d000; --cell-soft: #183324; --stranded: #2c4034;
+  --fixed: #9aa39c; --cell: #2fc24c; --accent: #00d000; --cell-soft: #183324; --stranded: #2c4034;
   --rest: #e3a73a; --fault: #ef6b55; --good: #3fe05a; color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -1031,7 +1031,33 @@ const CUSTOMERS = [
   .cmp td.v{font-family:var(--font-data);font-variant-numeric:tabular-nums;white-space:nowrap;width:19%}.cmp td.v small,.cmp td.c small{display:block;font-family:var(--font-ui);font-size:11.5px;color:var(--muted);white-space:normal;margin-top:2px}
   .cmp td.v.win{color:var(--cell);font-weight:600}.cmp td.v.win::after{content:" ✓";color:var(--accent)}.cmp td.d{font-family:var(--font-data);white-space:nowrap;width:14%;color:var(--muted)}.cmp td.d.pos{color:var(--good)}.cmp td.d.neg{color:var(--fault)}
   .cmp td.c{width:34%}.cmp td.c .src{font-size:11px;color:var(--muted);margin-top:3px}.cmp td.c .src a{color:var(--cell)}.cmp tr.grp td{background:var(--cell-soft);font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:7px 12px;border-bottom:0}
-  .cmpwrap{overflow-x:auto}`;
+  .cmpwrap{overflow-x:auto}
+  .cv{font-size:16px}.cv .card .cap,.cv .card p{font-size:15px;line-height:1.5}.cv .fine{font-size:13.5px}.cv .why p{font-size:16px;line-height:1.6}
+  .cv .card h2{font-size:21px;font-weight:500;margin-bottom:6px}
+  .story div{font-size:15.5px}.story b{font-size:16px}
+  .cv .pick button{font-size:15px;padding:9px 18px}
+  .scen{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}@media(max-width:800px){.scen{grid-template-columns:1fr}}
+  .scen button{display:flex;flex-direction:column;gap:4px;text-align:left;border-radius:16px;padding:14px 18px;border:1.5px solid var(--rule);background:var(--panel);color:var(--ink)}
+  .scen button .t{font-size:17px;font-weight:600}.scen button .d{font-size:14px;line-height:1.45;color:var(--muted)}
+  .scen button[aria-checked=true]{background:var(--ink);border-color:var(--ink);color:var(--bg)}.scen button[aria-checked=true] .d{color:var(--bg);opacity:.85}
+  .scen button .t::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;border:2px solid currentColor;margin-right:10px;vertical-align:-1px}
+  .scen button[aria-checked=true] .t::before{background:var(--accent);border-color:var(--accent)}
+  .verdict .k{font-size:12.5px}.verdict .head{font-size:36px}.verdict .s{font-size:15px}.verdict ul{font-size:15px;line-height:1.6}
+  .chip{display:inline-block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;border:1px solid rgba(245,247,243,.35);border-radius:999px;padding:3px 10px;margin-left:8px;color:#f5f7f3}
+  .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}@media(max-width:1000px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){.tiles{grid-template-columns:1fr}}
+  .tile{background:var(--panel);border:1px solid var(--rule);border-radius:16px;padding:16px 18px}.tile .tt{font-size:17px;font-weight:600}.tile .ts{font-size:13.5px;color:var(--muted);margin:2px 0 12px}
+  .tile .br{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:10px;align-items:center;margin:7px 0}.tile .bl{font-size:13.5px;color:var(--muted)}
+  .tile .bar{height:14px;border-radius:7px;background:var(--cell-soft);overflow:hidden;display:block}.tile .bar i{display:block;height:100%;border-radius:7px}
+  .tile .bv{font-family:var(--font-data);font-size:15px;min-width:76px;text-align:right}.tile .bv.strong{font-weight:600;color:var(--cell)}
+  .tile .td{margin-top:10px;font-size:14.5px;font-weight:600}.tile .td.pos{color:var(--good)}.tile .td.neg{color:var(--fault)}
+  .duo{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:16px}@media(max-width:1000px){.duo{grid-template-columns:1fr}}
+  .cv svg.rc{width:100%;height:auto;display:block}.cv svg.rc text{font-family:var(--font-ui)}
+  .be .big2{font-size:44px;font-weight:300;letter-spacing:-.02em;color:var(--cell);margin:2px 0}.be .track{position:relative;height:16px;border-radius:8px;background:var(--cell-soft);margin:34px 0 8px}
+  .be .fill{position:absolute;left:0;top:0;height:100%;border-radius:8px;background:var(--cell)}.be .fill.bad{background:var(--fault)}
+  .be .mk{position:absolute;top:-8px;width:3px;height:32px;background:var(--ink);border-radius:2px}.be .mk span{position:absolute;top:-24px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:13px;font-weight:600;color:var(--ink)}
+  .be .ticks{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+  .cmp{font-size:15.5px}.cmp thead th{font-size:12.5px}.cmp td.v small,.cmp td.c small{font-size:13px}.cmp td.c .src{font-size:12.5px;line-height:1.4}.cmp tr.grp td{font-size:12.5px;padding:9px 12px}.cmp th,.cmp td{padding:13px 12px}
+  .cv .srcs table,.cv .srcs td,.cv .srcs th{font-size:14px}.cv .econ{font-size:14.5px}`;
   document.head.appendChild(st);
   const main = document.querySelector(".main");
   const g = document.createElement("div"); g.className = "card guide";
@@ -1144,7 +1170,7 @@ function renderCustomer(cur) {
     row("Round-trip efficiency", `Assumed, reduced for REON by the conduction loss of its per-cell switches. REON says the loss is minimal but not zero; a 1 mΩ switch would cost about 3% and erase the value.`, ["reon"],
       V(P.rte, `${P.rte.toFixed(1)}%`), V(rteC, `${rteC.toFixed(1)}%`), "", `switches cost ${(100 - P.eff).toFixed(1)}%`, `${sgn(rteC - P.rte, x => x.toFixed(1))} pts`, "hi", Math.sign(rteC - P.rte)),
     grp("Reliability"),
-    row("Chance one cell stops the battery in 10 years", `In a series string any one failed cell stops the battery: chance = 1 − (1 − rate)^(cells × 10 years), at ${ppmShown} ppm per cell-year (${P.N} cells). REON switches a failed cell out and needs service only after more than ${P.k} have failed. No public per-cell failure data exists, so the rate is an assumed range.`, ["epri", "recur"],
+    row(fail ? "Chance one cell stops the battery in 10 years" : "Chance one cell stops the battery in 10 years (illustration; not in the base-case value)", `In a series string any one failed cell stops the battery: chance = 1 − (1 − rate)^(cells × 10 years), at ${ppmShown} ppm per cell-year (${P.N} cells). REON switches a failed cell out and needs service only after more than ${P.k} have failed. No public per-cell failure data exists, so the rate is an assumed range.`, ["epri", "recur"],
       V(failF, `${(100 * failF).toFixed(0)}%`), V(failC, "≈ 0%"), `any of ${P.N} cells`, `${P.k} backup cells take over`, `${sgn(-100 * failF, x => x.toFixed(0))} pts`, "lo", 1),
     grp("Environment"),
     row(`Clean energy delivered over ${P.horizon} years`, `Energy each design delivers over the horizon, including replacements. Each extra MWh displaces ISO-NE average grid power at ${P.gridCO2} lb CO₂/MWh (peak hours are dirtier, so this is conservative).`, ["isone"],
@@ -1153,6 +1179,44 @@ function renderCustomer(cur) {
       V(usedF, `${usedF.toFixed(0)} kWh`), V(usedC, `${usedC.toFixed(0)} kWh`), `${(usedF * P.embodiedCO2 / 1000).toFixed(1)} t CO₂e · ${(usedF * P.cellKgPerKWh).toFixed(0)} kg cells`, `${(usedC * P.embodiedCO2 / 1000).toFixed(1)} t CO₂e · ${(usedC * P.cellKgPerKWh).toFixed(0)} kg cells`, sgn(usedC - usedF, x => x.toFixed(0) + " kWh"), "lo", -Math.sign(usedC - usedF)),
     `<tr><td class="c"><b>Total CO₂ avoided with REON</b>${info("Extra clean energy delivered × grid intensity, plus the embodied CO₂ of battery capacity not manufactured.")}</td><td class="v">–</td><td class="v win">${co2.toFixed(1)} t</td><td class="d ${co2 >= 0 ? "pos" : "neg"}">${sgn(co2, x => x.toFixed(1) + " t")}</td></tr>`,
   ].join("");
+  const tile = (title, sub, fv, cv, fmt, better, delta) => {
+    const mx = Math.max(Math.abs(fv), Math.abs(cv), 1e-9), w = v => v > 0 ? Math.max(3, 100 * v / mx) : 1.5, good = better === "hi" ? cv > fv : cv < fv;
+    return `<div class="tile"><div class="tt">${title}</div><div class="ts">${sub}</div>
+      <div class="br"><span class="bl">Conventional</span><span class="bar"><i style="width:${w(fv)}%;background:var(--fixed)"></i></span><span class="bv">${fmt(fv)}</span></div>
+      <div class="br"><span class="bl">REON</span><span class="bar"><i style="width:${w(cv)}%;background:var(--cell)"></i></span><span class="bv strong">${fmt(cv)}</span></div>
+      <div class="td ${good ? "pos" : "neg"}">${delta}</div></div>`; };
+  const mUSD = v => (v < 0 ? "−" : "") + money(Math.abs(v));
+  const tiles = [
+    tile(`Net value over ${P.horizon} years`, "after purchases, replacements and O&M", h.fixed.npv * n, h.cell.npv * n, mUSD, "hi", `${sgn(h.dNPV * n, money)} with REON`),
+    tile("Battery life", `years until it holds under ${P.retire}% of its rated energy`, lifeF, lifeC, v => v.toFixed(1) + " y", "hi", `${sgn(lifeC - lifeF, x => x.toFixed(1) + " y")} (${sgn(100 * (lifeC / lifeF - 1), x => x.toFixed(0))}%)`),
+    tile("Energy delivered", "total over one battery's life", f.mwh * n, c.mwh * n, v => v.toFixed(0) + " MWh", "hi", `${sgn(100 * (c.mwh / f.mwh - 1), x => x.toFixed(0))}% usable energy`),
+    tile("Payback", "years until savings repay the purchase", isNaN(pbF) ? 99 : pbF, isNaN(pbC) ? 99 : pbC, v => v >= 98 ? "n/a" : v.toFixed(1) + " y", "lo", isNaN(pbF) || isNaN(pbC) ? "–" : `${sgn(pbC - pbF, x => x.toFixed(1) + " y")} vs conventional`),
+    tile(`Batteries bought in ${P.horizon} years`, "including replacements", h.fixed.blocks * n, h.cell.blocks * n, v => v.toFixed(1), "lo", `${sgn(h.cell.blocks * n - h.fixed.blocks * n, x => x.toFixed(1))} batteries`),
+    tile("Chance one cell stops the battery", fail ? `within 10 years, at ${ppmShown} failures per million cells a year` : `an illustration at ${ppmShown} failures per million cells a year; not counted in the base case`, failF, failC, v => v < 0.005 ? "≈ 0%" : (100 * v).toFixed(0) + "%", "lo", `${sgn(-100 * failF, x => x.toFixed(0))} points`),
+  ].join("");
+  // usable energy over the battery's life (median); each line stops when that design's battery is replaced
+  const retSvg = (() => {
+    if (!f.p50 || !c.p50) return "";
+    const W = 760, H = 340, L = 56, Rm = 24, T = 18, B = 50, thr = P.retire / 100, y0 = 0.6, y1 = 1.02;
+    const x = t => L + (W - L - Rm) * t / YEARS, y = v => T + (H - T - B) * (1 - (Math.min(Math.max(v, y0), y1) - y0) / (y1 - y0));
+    const upto = (arr, life) => { const m = Math.min(K - 1, Math.max(1, Math.round(life / DT))); return Array.from(arr.slice(0, m + 1)); };
+    const path = a => a.map((v, i) => `${i ? "L" : "M"}${x(i * DT).toFixed(1)},${y(v).toFixed(1)}`).join("");
+    const pf = upto(f.p50, lifeF), pc = upto(c.p50, lifeC), ef = pf[pf.length - 1], ec = pc[pc.length - 1];
+    const g = [];
+    for (const v of [0.6, 0.7, 0.8, 0.9, 1.0]) g.push(`<line x1="${L}" x2="${W - Rm}" y1="${y(v)}" y2="${y(v)}" stroke="var(--rule)"/><text x="${L - 8}" y="${y(v) + 5}" text-anchor="end" font-size="14" fill="var(--muted)">${Math.round(v * 100)}%</text>`);
+    for (let t = 0; t <= YEARS; t += 2) g.push(`<text x="${x(t)}" y="${H - B + 24}" text-anchor="middle" font-size="14" fill="var(--muted)">${t}</text>`);
+    g.push(`<text x="${(L + W - Rm) / 2}" y="${H - 6}" text-anchor="middle" font-size="14" fill="var(--muted)">years in service</text>`);
+    g.push(`<line x1="${L}" x2="${W - Rm}" y1="${y(thr)}" y2="${y(thr)}" stroke="var(--fault)" stroke-dasharray="6 5" stroke-width="1.5"/><text x="${W - Rm}" y="${y(thr) + 20}" text-anchor="end" font-size="13.5" fill="var(--fault)">battery replaced below ${P.retire}%</text>`);
+    g.push(`<path d="${path(pf)}" fill="none" stroke="var(--fixed)" stroke-width="3" stroke-linecap="round"><title>Conventional battery: median usable energy</title></path>`);
+    g.push(`<path d="${path(pc)}" fill="none" stroke="var(--cell)" stroke-width="3" stroke-linecap="round"><title>REON: median usable energy</title></path>`);
+    g.push(`<circle cx="${x(lifeF)}" cy="${y(ef)}" r="6" fill="var(--fixed)" stroke="var(--panel)" stroke-width="2"><title>Conventional replaced at ${lifeF.toFixed(1)} years</title></circle><circle cx="${x(lifeC)}" cy="${y(ec)}" r="6" fill="var(--cell)" stroke="var(--panel)" stroke-width="2"><title>REON replaced at ${lifeC.toFixed(1)} years</title></circle>`);
+    const near = Math.abs(x(lifeC) - x(lifeF)) < 170;
+    const convLeft = x(lifeF) - (near ? 10 : 0) - 235 < L;
+    g.push(`<text x="${convLeft ? x(lifeF) + 12 : x(lifeF) - (near ? 10 : 0)}" y="${convLeft ? y(ef) + 26 : y(ef) - 16}" text-anchor="${convLeft ? "start" : "end"}" font-size="15" font-weight="600" fill="var(--ink)">Conventional: replaced at ${lifeF.toFixed(1)} y</text>`);
+    g.push(`<text x="${x(lifeC) + 12 + 220 > W ? x(lifeC) : x(lifeC) + 12}" y="${y(ec) - (near ? 40 : 16)}" text-anchor="${x(lifeC) + 12 + 220 > W ? "end" : "start"}" font-size="15" font-weight="600" fill="var(--cell)">REON: replaced at ${lifeC.toFixed(1)} y</text>`);
+    return `<svg class="rc" viewBox="0 0 ${W} ${H}" role="img" aria-label="Line chart of median usable energy over years in service. Conventional is replaced at ${lifeF.toFixed(1)} years, REON at ${lifeC.toFixed(1)} years.">${g.join("")}</svg>`;
+  })();
+  const beMax = Math.max(beP, P.bmsOverhead, 5) * 1.25, bx = v => (100 * Math.max(v, 0) / beMax).toFixed(1);
   $("cview").innerHTML = `
   <div class="story">
     <div><b>1 · The problem</b>In a conventional battery all cells are wired in one line. The weakest cell decides how much energy the battery gives and when it is replaced, and one failed cell stops all ${P.N}.</div>
@@ -1161,18 +1225,33 @@ function renderCustomer(cur) {
   </div>
   <div class="card"><h2>What REON's cell-level control is worth to ${sel ? `a ${sel.name.toLowerCase()}` : "this site"}</h2>
     <p class="cap">${n} × REON EBS (${n * 30} kW / ${kWh} kWh) behind the meter in Massachusetts, ${tariffName(P.dcRate)}, from ${P.startYear}. Compared with the same cells in a conventional battery whose weakest cell limits the whole string. Pick a customer:</p>
-    <div class="pick">${CUSTOMERS.map(x => `<button type="button" data-c="${x.id}" aria-pressed="${sel && sel.id === x.id}" title="${x.blurb}">${x.name}</button>`).join("")}
-      <button type="button" id="cvFail" aria-pressed="${fail && P.onFault === "retire"}" title="0.1% cell failures per year; a conventional block is replaced at its first cell failure">Include cell failures (REON's 2–3× case)</button></div>
-    <p class="fine">${sel ? sel.blurb + ". " : ""}${fail ? `Cell failures on: ${P.faultPPM} ppm per cell-year, conventional block ${P.onFault === "retire" ? "replaced at its first failure" : "repaired (outage and visit)"}.` : "No sudden cell failures (aging only)."}</p></div>
+    <div class="pick">${CUSTOMERS.map(x => `<button type="button" data-c="${x.id}" aria-pressed="${sel && sel.id === x.id}" title="${x.blurb}">${x.name}</button>`).join("")}</div>
+    <p class="fine">${sel ? sel.blurb + "." : ""}</p>
+    <h2 style="margin-top:16px">Which scenario?</h2>
+    <div class="scen" role="radiogroup" aria-label="Scenario">
+      <button type="button" role="radio" data-sc="base" aria-checked="${!fail}"><span class="t">Base case</span><span class="d">Cells wear out at different speeds, as measured in real electric-vehicle batteries. No sudden cell failures. This is the number we can back with data.</span></button>
+      <button type="button" role="radio" data-sc="fail" aria-checked="${fail}"><span class="t">Cell failures included (REON's upside case)</span><span class="d">Also assumes 1 in 1,000 cells fails each year (an assumption; no public data) and a conventional battery is replaced whenever one cell fails. This is where REON's "2–3×" comes from.</span></button>
+    </div></div>
   <div class="verdict">
-    <div><div class="k">Recommendation for ${sel ? `a ${sel.name.toLowerCase()}` : "this site"}</div>
+    <div><div class="k">Recommendation for ${sel ? `a ${sel.name.toLowerCase()}` : "this site"} <span class="chip">${fail ? "Cell failures included" : "Base case"}</span></div>
       <div class="head">${win ? `REON comes out <b>${gain} ahead</b> over ${P.horizon} years.` : `A conventional battery comes out <b>${gain} ahead</b> at these assumptions.`}</div>
       <div class="s">Net present value, REON minus conventional, for ${n} × 60 kWh blocks after REON's assumed +${P.bmsOverhead}% BMS cost. In 80% of simulated batteries the difference is between ${money(h.dNPVp10 * n)} and ${money(h.dNPVp90 * n)}.${info("Each design is simulated with the same cells; the difference is averaged over " + P.packs + " batteries. Open the Engineering view to change any assumption.")}</div></div>
     <div><div class="k">What decides it</div><ul>
       <li>REON pays off for this customer if its price premium is under <b>${beP.toFixed(0)}%</b> of system cost (assumed ${P.bmsOverhead}%).${info("Break-even premium: the extra price at which REON's net value equals the conventional battery's. Purchase and replacement costs scale with the premium; everything else is unchanged.")}</li>
-      <li>Battery life <b>${lifeF.toFixed(1)} → ${lifeC.toFixed(1)} y</b>, energy delivered <b>+${(100 * (c.mwh / f.mwh - 1)).toFixed(0)}%</b>, ${fail ? `and no outage from a single failed cell (conventional: <b>${(100 * failF).toFixed(0)}%</b> chance in 10 years)` : `and single-cell failures are covered by ${P.k} backup cells (switch on “Include cell failures” to price them in)`}.</li>
+      <li>Battery life <b>${lifeF.toFixed(1)} → ${lifeC.toFixed(1)} y</b>, energy delivered <b>+${(100 * (c.mwh / f.mwh - 1)).toFixed(0)}%</b>, ${fail ? `and no outage from a single failed cell (conventional: <b>${(100 * failF).toFixed(0)}%</b> chance in 10 years)` : `and single-cell failures are covered by ${P.k} backup cells (choose “Cell failures included” above to price them in)`}.</li>
       <li>Assumes REON's per-cell switches cost ${(100 - P.eff).toFixed(1)}% of round-trip energy (about ${(0.5 * (100 - P.eff) / 1.6).toFixed(2)} mΩ per switch at 100 A). At 1 mΩ (3.2%) the gain turns negative, so this is the number to confirm with REON.</li>
     </ul></div>
+  </div>
+  <div class="tiles">${tiles}</div>
+  <div class="duo">
+    <div class="card"><h2>How long each battery stays useful</h2>
+      <p class="cap">Usable energy as a share of rated energy. Each line ends when that battery has to be replaced${fail ? " (here, when its first cell fails)" : ""}. Median over ${P.packs} simulated batteries.</p>${retSvg}</div>
+    <div class="card be"><h2>How much more could REON cost?</h2>
+      <p class="cap">The highest extra price over a conventional battery at which REON still pays off for this customer.</p>
+      <div class="big2">${beP > 0 ? `up to +${beP.toFixed(0)}%` : "no premium"}</div>
+      <div class="track"><i class="fill ${beP >= P.bmsOverhead ? "" : "bad"}" style="width:${bx(beP)}%"></i><b class="mk" style="left:${bx(P.bmsOverhead)}%"><span${bx(P.bmsOverhead) < 20 ? ' style="left:-2px;transform:none"' : ""}>we assume +${P.bmsOverhead}%</span></b></div>
+      <div class="ticks"><span>0%</span><span>break-even +${Math.max(beP, 0).toFixed(0)}%</span></div>
+      <p class="fine" style="margin-top:12px">REON says its cell-level BMS costs about 3× a conventional one (2–3% of system cost), so we assume +${P.bmsOverhead}%. The real price is REON's to set.</p></div>
   </div>
   <div class="card"><h2>Side by side: conventional battery vs REON cell-level control</h2>
     <p class="cap">Same cells, same site, same tariff. ✓ marks the better option on each line; hover ⓘ for how it is calculated, and follow the source links.</p>
@@ -1185,7 +1264,7 @@ function renderCustomer(cur) {
   ${sourcesCard()}`;
   const es = document.getElementById("engSrc"); if (es) es.innerHTML = sourcesCard();
   $("cview").querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", () => setCustomer(CUSTOMERS.find(x => x.id === b.dataset.c))));
-  $("cvFail").addEventListener("click", () => { const on = !(P.faultPPM > 0 && P.onFault === "retire"); Object.assign(P, on ? { faultPPM: 1000, onFault: "retire" } : { faultPPM: 0, onFault: "repair" }); buildControls(); changed(); });
+  $("cview").querySelectorAll("[data-sc]").forEach(b => b.addEventListener("click", () => { const on = b.dataset.sc === "fail"; Object.assign(P, on ? { faultPPM: 1000, onFault: "retire" } : { faultPPM: 0, onFault: "repair" }); buildControls(); changed(); }));
 }
 
 buildControls();
