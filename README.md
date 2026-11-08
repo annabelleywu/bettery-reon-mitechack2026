@@ -19,6 +19,7 @@ MIT Energy & Climate Hack 2026, REON challenge. Team: Isabell Luo (MIT), Annabel
 **Where to read more:**
 - [`docs/Methodology_v2.md`](docs/Methodology_v2.md): the full method, every assumption with its source, validation, results, sensitivities and limitations.
 - [`docs/Reliability_and_Customers_Research.md`](docs/Reliability_and_Customers_Research.md): REON CTO notes, cell failure rates, Massachusetts outage costs and rates, customers.
+- [`docs/NE_Cold_and_Market_Estimates.md`](docs/NE_Cold_and_Market_Estimates.md): NE Cold site estimate and model rerun, Massachusetts and US market size (every step shown), solar-charging CO₂ caveat, switch-loss check at the rated current.
 - [`docs/MA_Economics_Research.md`](docs/MA_Economics_Research.md): the Massachusetts market, policy and revenue research (42 sources).
 - **Dashboard**: [`webapp/index.html`](webapp/index.html) (open in a browser, no build), also published at https://claude.ai/artifact/2uKjEAMjq2JzoyPa3ejHJd. A **Customer view** (value, cycle life, usable capacity, round-trip efficiency, payback, reliability, CO₂, with customer presets) and an **Engineering view** (every assumption as a slider, per-cell rings over time, sweeps).
 

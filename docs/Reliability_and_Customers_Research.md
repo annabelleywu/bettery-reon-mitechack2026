@@ -13,7 +13,7 @@ Why this file exists: after meeting Tim Ren (REON CTO), we are adding the single
 | String size | 200–300 cells in series in one string | 250 cells per 60 kWh block |
 | Redundancy | About 90% of cells in use and 10% redundant backups; switches rotate cells, they do not bypass permanently | Headroom k = 10% of the string (25 of 250) |
 | Cell voltage | 2.5–3.6 V for their sodium cells (vs 3.0–4.2 V lithium), set by the chemistry | Voltage floor 2.5 V already used for βpower |
-| Cells | 20,000-cycle NFPP sodium cells; industry warranty 10 years / 8,000 cycles | Our aging is pessimistic for these cells (upside) |
+| Cells | 20,000-cycle NFPP sodium cells (REON's rating for the EBS Na+, no test conditions or warranty given [R25]); typical commercial warranty 10 years / 8,000 cycles [R26, R27], confirmed by Tim | Our aging is pessimistic for these cells (upside) |
 | Sensing | Within 5%, often much better; voltage and temperature (terminal and body) per cell, up to 100 Hz | 5% sensing barely changes the result |
 | Switch loss | "Very minimum overhead, but not none", depends on switch impedance | Kept at 0.5%; 1 mΩ switches would erase the gain (sensitivity) |
 | 2–3× | REON's own comparison of its system against a weakest-link base system | Our model reaches this range only when the base system is lost at its first cell failure (Section 3). We do not know how REON measured it, so we do not claim to replicate it |
@@ -62,6 +62,8 @@ Two cases bracket reality, and the model now runs both:
 
 **Cold storage (for example Americold).**
 - Americold's own site lists Massachusetts warehouses in Gloucester (Rogers St. and Rowe Square), Taunton and Middleborough [R22]. When Middleborough opened in 2018 (built for Ocean Spray), Americold had five Massachusetts sites including Boston, almost 19 million cubic feet in total [R18]; we have not confirmed that the Boston site still operates.
+- Americold reports real-time energy tracking at more than 90% of facilities, AI-controlled pre-cooling ahead of peak events and 34 facilities with solar, 11 more planned for 2026 [R24]. Brian Dunn (SVP of Facilities & Engineering) describes using AI to predict peak rates and pre-cool, in the FWtoday interview at 9:07 [R21].
+- Independent Massachusetts cold stores: Ice Cube Cold Storage & Logistics (Fall River; bought Maritime International's Main Terminal Division in 2021 and began a 200,000 sq ft facility) [R28, R29], Waterfront Cold Store (four locations in New Bedford and Taunton) [R30], and Maritime International (New Bedford, over 190,000 sq ft of facilities) [R31].
 - Americold sites already took part in an Eversource demand-management program using thermal storage from Viking Cold, alongside Sysco and the Greater Boston Food Bank [R19]. Massachusetts cold-storage operators are therefore already paying to cut peaks.
 - Demand charges are often quoted as 30–50% of a cold-storage bill, with refrigeration compressors using 70–80% of the electricity (vendor blog citing others; indicative only) [R20].
 - Americold says its buildings hold temperature for up to a week without power [R21], so for them the value is demand charges and grid programs, not backup.
@@ -113,9 +115,17 @@ So a small grocer on G-1's demand option would see a higher value per kW than ou
 | R16 | (dropped in audit) | — |
 | R17 | Mass.gov, AMP energy storage grants, Sep 18, 2026 | https://www.mass.gov/news/healey-driscoll-administration-awards-more-than-40-million-to-power-critical-facilities-during-outages |
 | R18 | Fleet Owner, Americold Middleborough opening (five MA sites) | https://fleetowner.com/refrigerated-transporter/cold-storage-logistics/article/21231791/americold-ocean-spray-open-new-facility-in-middleborough-ma |
-| R19 | RefIndustry, Viking Cold / Eversource project (Americold, Sysco, Greater Boston Food Bank) | https://refindustry.com/news/cold-chain/viking-cold-named-platinum-winner-of-cleanie-award-s-project-of-the-year/whatsapp:/send |
+| R19 | RefIndustry, Viking Cold / Eversource project (Americold, Sysco, Greater Boston Food Bank) | https://refindustry.com/news/cold-chain/viking-cold-named-platinum-winner-of-cleanie-award-s-project-of-the-year/ |
 | R20 | Envigilance, cold storage demand charges (vendor blog citing Inertia Resources, EIA CBECS; indicative) | https://envigilance.com/blog/cold-storage-demand-charges/ |
 | R21 | FreightWaves, Americold's outage resilience | https://www.freightwaves.com/news/americolds-secret-to-surviving-power-outages |
 | R22 | Americold, Gloucester (Rogers St.) facility page, listing nearby Massachusetts sites | https://www.americold.com/gloucester-rogers-st-ma-americold-logistics-gloucester-ma/ |
 | R23 | Eversource, 2026 Summary of Eastern Massachusetts Electric Rates (effective Sep 1, 2026) | https://www.eversource.com/docs/default-source/rates-tariffs/ema-greater-boston-rates.pdf?sfvrsn=c27ef362_36 |
+| R24 | Nareit, Americold Turns Sustainability Into a Performance Strategy (Jun 16, 2026) | https://www.reit.com/news/articles/americold-turns-sustainability-into-a-performance-strategy |
+| R25 | REON, hardware page (EBS 30 kW / 60 kWh; EBS Na+ "20,000-Cycle Life"; no test conditions or warranty stated) | https://www.reoncorp.com/hardware |
+| R26 | SMA, commercial storage datasheet (10-year capacity warranty, up to 8,000 full cycles) | https://res.cloudinary.com/gpceurope/image/upload/v1703147092/jnziodh7wyhzd56bbprj.pdf |
+| R27 | SolarEdge, commercial battery warranty (70% capacity until 8,000 full cycles) | https://solar-distribution.baywa-re.de/out/media/37-CSS_OD_107_kWh_Backup_se-css-107kwh-battery-warranty.pdf |
+| R28 | CB Insights, Ice Cube Cold Storage & Logistics (451 Currant Rd, Fall River) | https://www.cbinsights.com/investor/ice-cube-cold-storage-logistics |
+| R29 | PR Newswire, Ice Cube acquires the Main Terminal Division of Maritime International (2021) | https://prnewswire.com/news-releases/ice-cube-cold-storage--logistics-announces-the-acquisition-of-the-main-terminal-division-of-maritime-international-inc-301380446.html |
+| R30 | Racklify, Waterfront Cold Store (New Bedford and Taunton) | https://racklify.com/warehouses/waterfront-cold-store-llc-1/ |
+| R31 | Maritime International (New Bedford complex, over 190,000 sq ft) | https://yourmaritime.com |
 | — | Tim Ren (REON CTO), in person and hack Discord, Nov 7, 2026 | Not public |

@@ -1343,9 +1343,10 @@ function updateRange() {
   const mine = CUR.horizon.dNPV * P.nBlocks, fail = P.faultPPM > 0;
   const base = fail ? ALT : mine, up = fail ? mine : ALT, fmt = v => v == null ? "…" : `${v >= 0 ? "+" : "−"}${money(Math.abs(v)).replace("−", "")}`;
   el.innerHTML = `<div><div class="t">Normal aging</div><div class="v">${fmt(base)}</div><p>Cells wear out at slightly different speeds, as in any real battery. No cell fails outright.</p></div>
-    <div><div class="t">Aging plus cell failures</div><div class="v">${fmt(up)}</div><p>If about 1 in 1,000 cells fails each year, one failure stops a conventional battery and it is replaced. That failure rate is our assumption; REON's field data would replace it.</p></div>`;
+    <div><div class="t">Aging plus cell failures</div><div class="v">${fmt(up)}</div><p>If about 1 in 1,000 cells fails each year, one failure stops a conventional battery and it is replaced, the worst case for the owner of a conventional battery. If the block is repaired on site instead, REON's edge is about $12k in the Python model. The failure rate is our assumption; REON's field data would replace it.</p></div>`;
 }
 
+Object.assign(P, CUSTOMERS[0].set); // the page opens on the NE Cold customer; "Reset" returns to the model default
 buildControls();
 setTimeout(() => { DEF = runAll(clone(DEFAULTS), DEFAULTS.packs, true); recompute(); }, 0);
 </script>
