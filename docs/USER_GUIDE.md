@@ -36,20 +36,21 @@ The **Customer view** opens with these three panels:
 
 **Include cell failures (REON's 2–3× case)** switches on random cell failures (0.1% per cell per year). A conventional battery is then replaced at its first failure, because one failed cell stops it. Turn it on to see where REON's 2–3× claim comes from; turn it off for aging alone.
 
-**The cards.** Hover over **ⓘ** on any card to see how it is calculated; the links under each card go to its sources.
+**The recommendation panel** (dark green) answers the customer's question in one line: which option comes out ahead over 20 years, and by how much (with the range across simulated batteries). Beside it, **What decides it** lists:
+- **Break-even price premium.** The highest extra price REON's system can carry and still pay off for this customer (about 9% for the default site, against 4% assumed). This is also a pricing guide for REON.
+- **The physical gains.** Battery life, energy delivered and single-cell failure protection.
+- **The main risk.** Per-cell switch losses: at 1 mΩ per switch the gain turns negative, so this is the number to confirm with REON.
 
-| Card | What it means |
+**Side-by-side table.** One column for a conventional battery and one for REON with the same cells, site and tariff, plus a difference column. A ✓ marks the better option on each line. Hover over **ⓘ** to see how a line is calculated; the links under each line go to its sources.
+
+| Group | Lines |
 |---|---|
-| Extra value over 20 years | REON's net present value minus the conventional battery's, after REON's higher BMS cost. Both owners buy a new battery when the old one retires. The range (P10 to P90) is the spread over simulated batteries. |
-| System cycle life | Years (and cycles) until the battery can deliver less than 70% of its rated energy. |
-| Energy delivered per battery | Total energy each battery delivers before it retires. |
-| Batteries worn out over 20 years | How many battery-lifetimes the site uses up; fewer means fewer replacements and fewer cells manufactured. |
-| Usable capacity at year 5 | How much of the battery the customer can actually use (its real depth of discharge). |
-| Round-trip efficiency | Energy out per energy in; REON's per-cell switches cost a little. |
-| Payback | Years until savings repay the purchase, after the 30% federal tax credit. |
-| Chance one cell stops the battery | Over 10 years, for a conventional battery, against about zero with REON's backup cells. |
-| CO₂ avoided, cells kept out of waste | From extra clean energy delivered and batteries not manufactured. |
-| 20-year value, conventional / REON | The two totals behind the first card. |
+| Money over 20 years | Net value to the owner (present value of earnings minus purchases, replacements and O&M), upfront price after the 30% tax credit, payback, batteries bought over 20 years |
+| Battery performance | Service life (years and cycles to 70% of rated energy), energy delivered over one battery's life, usable capacity at year 5, round-trip efficiency |
+| Reliability | Chance one failed cell stops the battery in 10 years |
+| Environment | Clean energy delivered over 20 years, battery capacity used up (with its manufacturing CO₂ and cell mass), total CO₂ avoided with REON |
+
+REON is not better on every line: it costs a little more upfront and its switches lose a little energy. The table shows those trade-offs next to the gains so a customer can weigh them.
 
 **Assumptions and sources** at the bottom lists every input, its value, whether it is data, from REON, sourced or assumed, and a link to the source.
 
@@ -58,7 +59,7 @@ The **Customer view** opens with these three panels:
 A short "How to read this view" note sits at the top. Then:
 
 - **Left: every assumption as a slider**, grouped by topic (pack and string, retirement, Massachusetts site economics, REON's BMS cost, control policy, per-cell monitoring, cell aging, hard cell failures, simulation). Grey notes give each input's source or status. **Reset to defaults** undoes everything; a second button loads REON's 2–3× case.
-- **Four tiles**: service life, lifetime energy, firm power and power utilization, conventional (grey, left) against REON (blue, right).
+- **Four tiles**: service life, lifetime energy, firm power and power utilization, conventional (grey, left) against REON (green, right).
 - **Value table**: year-1 revenue by program, payback, NPV over each battery's own life, and the 20-year comparison with replacements.
 - **Rings**: each spoke is one cell. Press **Play** to watch cells age; grey is energy the conventional string strands because its weakest cell is empty.
 - **Usable energy over the battery's life**: median and range for both designs, with the 70% retirement line.
@@ -70,7 +71,7 @@ A short "How to read this view" note sits at the top. Then:
 1. Customer view, default site: about +12% energy and +11% life per battery, about +$4k per site over 20 years.
 2. Click **Cold-storage warehouse**: ten blocks, about five times the value.
 3. Click **Include cell failures**: the conventional battery's life roughly halves and REON's value jumps (REON's 2–3× claim).
-4. Hover over **ⓘ** on "Chance one cell stops the battery".
+4. Read the recommendation panel: the break-even price premium shows how much more REON can charge and still pay off.
 5. Engineering view → move **Backup cells k** from 25 to 5, then to 125, and watch the gain shrink and grow.
 6. Move **Cell-to-cell spread, multiple of the calibrated spread** (under Cell aging) to 2×: more uneven cells make REON worth more.
 
