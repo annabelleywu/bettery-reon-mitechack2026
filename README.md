@@ -14,6 +14,8 @@ MIT Energy & Climate Hack 2026, REON challenge. Team: Isabell Luo (MIT), Annabel
 | Customers: neighborhood grocer (G-1 demand option) / cold-storage warehouse (G-3, 10 blocks) | +$4.7k / +$20.7k |
 | Per 100 MW of C&I storage | +$7.2M, +19 GWh, 9.5 kt CO₂ avoided, 368 t of cells not made over 20 years |
 
+**Open the dashboard:** https://claude.ai/artifact/2uKjEAMjq2JzoyPa3ejHJd (or download the repo and double-click `webapp/index.html`). How to read it: [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
+
 **Where to read more:**
 - [`docs/Methodology_v2.md`](docs/Methodology_v2.md): the full method, every assumption with its source, validation, results, sensitivities and limitations.
 - [`docs/Reliability_and_Customers_Research.md`](docs/Reliability_and_Customers_Research.md): REON CTO notes, cell failure rates, Massachusetts outage costs and rates, customers.

@@ -1015,8 +1015,15 @@ const CUSTOMERS = [
   .cv{display:flex;flex-direction:column;gap:16px}.cv .row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}@media(max-width:1000px){.cv .row{grid-template-columns:repeat(2,minmax(0,1fr))}}
   .cv .big{padding:14px;border:1px solid var(--line, #d9dde5);border-radius:12px;background:var(--card, transparent)}.cv .big .lab{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
   .cv .big .val{font-size:28px;font-weight:600;color:var(--cell);margin:4px 0}.cv .big .sub{font-size:12.5px;color:var(--muted)}.cv .pick{display:flex;flex-wrap:wrap;gap:8px}.cv .pick button[aria-pressed=true]{border-color:var(--cell);box-shadow:inset 0 0 0 1px var(--cell)}
-  .cv .why{font-size:14px;line-height:1.5}.cv .why b{color:var(--ink)}.cv .fine{font-size:11.5px;color:var(--muted)}`;
+  .cv .why{font-size:14px;line-height:1.5}.cv .big .info,.cv .info{cursor:help;color:var(--muted);font-size:13px;text-transform:none}.cv .big .src{font-size:11px;color:var(--muted);margin-top:6px}.cv .big .src a,.srcs a{color:var(--cell)}
+  .story{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}@media(max-width:900px){.story{grid-template-columns:1fr}}.story div{padding:12px 14px;border-radius:12px;background:var(--cell-soft);font-size:13.5px;line-height:1.45}.story b{display:block;color:var(--cell);margin-bottom:4px}
+  .guide{font-size:13px;line-height:1.5;color:var(--muted)}.guide b{color:var(--ink)}.cv .why b{color:var(--ink)}.cv .fine{font-size:11.5px;color:var(--muted)}`;
   document.head.appendChild(st);
+  const main = document.querySelector(".main");
+  const g = document.createElement("div"); g.className = "card guide";
+  g.innerHTML = `<b>How to read this view.</b> Every assumption is a slider on the left (grouped, with its source or status in grey). The four tiles compare a conventional string (grey, left number) with REON's cell-level control (blue, right number). Below: the value table for the owner, a ring per design where each spoke is one cell (press Play to watch them age), usable energy over the battery's life, and three sweeps showing how the gain depends on backup cells, cell-to-cell spread and resting. Red dashed lines mark break-even against REON's extra BMS cost.`;
+  main.insertBefore(g, main.firstChild);
+  const es = document.createElement("div"); es.id = "engSrc"; main.appendChild(es);
   const grid = document.querySelector(".grid"), tabs = document.createElement("div"); tabs.className = "tabs"; tabs.setAttribute("role", "tablist");
   const mk = (id, label) => { const b = document.createElement("button"); b.type = "button"; b.id = id; b.textContent = label; b.setAttribute("role", "tab"); return b; };
   const tc = mk("tabCust", "Customer view"), te = mk("tabEng", "Engineering view"); tabs.append(tc, te);
@@ -1027,6 +1034,52 @@ const CUSTOMERS = [
   let saved = "c"; try { saved = localStorage.getItem("reonTab") || "c"; } catch (e) {}
   show(saved !== "e");
 })();
+const SRC = {
+  zhou: ["Zhou et al., Nature Energy (2026): cell-to-cell inconsistency in EV fleets", "https://doi.org/10.1038/s41560-026-02131-5"],
+  zhoudata: ["Paper source data (per-cell trajectories used for calibration)", "https://github.com/Rico-dicp/Ev-battery-cell-to-cell-inconsistency"],
+  reon: ["REON CTO Tim Ren, hack Discord and in-person Q&A (Nov 6–7, 2026); REON hack slides", ""],
+  evs: ["Eversource 2026 Summary of Eastern MA Electric Rates (effective Sep 1, 2026)", "https://www.eversource.com/docs/default-source/rates-tariffs/ema-greater-boston-rates.pdf?sfvrsn=c27ef362_36"],
+  cs: ["Mass Save / National Grid, ConnectedSolutions C&I program materials", "https://www.nationalgridus.com/media/pdfs/bus-ways-to-save/connectedsolutions-programmaterials.pdf"],
+  cps: ["Mass.gov, Clean Peak Energy Standard program review", "https://www.mass.gov/info-details/clean-peak-energy-standard-program-review"],
+  modo: ["Modo Energy, Massachusetts CPEC prices for batteries (Jul 2026)", "https://modoenergy.com/research/isone-ma-clean-peak-cpec-bess-battery-storage"],
+  atb: ["NREL Annual Technology Baseline, Commercial Battery Storage (O&M 2.5%/yr)", "https://atb.nrel.gov/electricity/2024/commercial_battery_storage"],
+  nrel25: ["NREL, Cost Projections for Utility-Scale Battery Storage: 2025 Update", "https://docs.nrel.gov/docs/fy25osti/93281.pdf"],
+  itc: ["Storage ITC schedule under current law (100% through 2033, 75% 2034, 50% 2035)", "https://natlawreview.com/article/congress-phases-out-energy-tax-credits"],
+  isone: ["ISO New England, 2024 Air Emissions Report (597 lb CO₂/MWh)", "https://www.iso-ne.com/static-assets/documents/100028/final-2024-air-emission-report.pdf"],
+  fraun: ["Fraunhofer (2025), comparative LCA of Li-ion, Na-ion and solid-state cells", "https://publica.fraunhofer.de/handle/publica/480983"],
+  epri: ["EPRI (2026), Risk Factors and Failure Statistics of Li-ion BESS", "https://restservice.epri.com/publicdownload/000000003002034920/0/Product"],
+  recur: ["US DOE / Recurrent: EV battery replacements due to failure (1.5%)", "https://www.energy.gov/cmei/vehicles/articles/fotw-1339-april-22-2024-plug-electric-vehicle-battery-replacements-due"],
+  inst: ["NuWatt, MA commercial battery calculator (installed $500–800/kWh; installer source)", "https://nuwattenergy.com/en/massachusetts/commercial-demand-charge-battery-calculator-2026"],
+  repo: ["Our methodology: every input, its source and the validation", "https://github.com/annabelleywu/mitec2026/blob/HEAD/docs/Methodology_v2.md"],
+};
+const srcLinks = ids => ids.map(id => SRC[id][1] ? `<a href="${SRC[id][1]}" target="_blank" rel="noopener">${SRC[id][0].split(/[,:(]/)[0].trim()}</a>` : SRC[id][0].split(/[,(]/)[0].trim()).join(" · ");
+const ASSUMPTIONS = [
+  ["Cell-to-cell aging spread", "Fitted to 95 real cell trajectories; matches the paper's fleet metrics", "Data", ["zhou", "zhoudata"]],
+  ["String design", "250 cells per string, 25 (10%) backup cells, 60 kWh / 30 kW per block", "REON", ["reon"]],
+  ["REON BMS cost", "+4% of system cost (REON: about 3× a conventional BMS, which is 2–3% of cost)", "REON (derived)", ["reon"]],
+  ["Switch loss", `${(100 - P.eff).toFixed(1)}% of energy (REON: "minimal, but not none")`, "Assumed", ["reon"]],
+  ["Retirement", `Below ${P.retire}% of nameplate energy (brief's stationary example)`, "Brief", []],
+  ["Demand charge", `${tariffName(P.dcRate)}: $${P.dcRate.toFixed(2)}/kW-month`, "Sourced", ["evs"]],
+  ["Demand-charge capture", `${P.dcRealize}% of the theoretical saving`, "Assumed (conservative)", []],
+  ["ConnectedSolutions", `$${P.csRate}/kW-summer on average kW over ${P.csHrs}-hour events`, "Sourced", ["cs"]],
+  ["Clean Peak certificates", `${P.cpsClear}% of the $65/MWh price (to 2032), $45 after`, "Sourced", ["cps", "modo"]],
+  ["Installed cost", `$${P.sysCost}/kWh; replacements follow NREL's mid-case price decline`, "Assumed / sourced", ["inst", "nrel25"]],
+  ["Fixed O&M", `${P.fom}% of installed cost a year`, "Sourced", ["atb"]],
+  ["Tax credit", `${P.itc}% through 2033, then 22.5%, 15%, 0`, "Sourced", ["itc"]],
+  ["Round-trip efficiency", `${P.rte}%`, "Assumed", []],
+  ["Discount rate, horizon", `${P.discount}%, ${P.horizon} years`, "Assumed", []],
+  ["Grid CO₂", `${P.gridCO2} lb/MWh (ISO-NE average; conservative for peak hours)`, "Sourced", ["isone"]],
+  ["Cell manufacturing CO₂", `${P.embodiedCO2} kg CO₂e per kWh of cells (sodium-ion 75–87)`, "Sourced", ["fraun"]],
+  ["Cell failure rate", P.faultPPM ? `${P.faultPPM} ppm per cell-year` : "Off (aging only); 10–1,000 ppm tested", "Assumed range (no public field data)", ["epri", "recur"]],
+];
+function sourcesCard() {
+  return `<div class="card srcs"><h2>Assumptions and sources</h2>
+    <p class="cap">Every number on this page comes from the inputs below. Hover over ⓘ on any card to see how it is calculated. Change any input in the Engineering view.</p>
+    <table class="econ"><thead><tr><th>Input</th><th>Value used</th><th>Status</th><th>Source</th></tr></thead><tbody>
+    ${ASSUMPTIONS.map(([a, v, s, ids]) => `<tr><td>${a}</td><td>${v}</td><td>${s}</td><td>${ids.length ? srcLinks(ids) : "—"}</td></tr>`).join("")}
+    </tbody></table>
+    <p class="fine">Full list with notes: ${srcLinks(["repo"])}. Estimates under stated assumptions, not REON performance claims.</p></div>`;
+}
 function setCustomer(c) { Object.assign(P, c.set); buildControls(); changed(); }
 function renderCustomer(cur) {
   const n = P.nBlocks, h = cur.horizon, f = cur.fixed, c = cur.cell, kWh = P.blockKWh * n;
@@ -1039,35 +1092,42 @@ function renderCustomer(cur) {
   const avoidKWh = kWh * P.horizon * (1 / Math.max(lifeF, 0.1) - 1 / Math.max(lifeC, 0.1));
   const co2 = (h.cell.mwh - h.fixed.mwh) * n * P.gridCO2 * 0.000453592 + avoidKWh * P.embodiedCO2 / 1000;
   const rteC = P.rte * P.eff / 100;
-  const box = (lab, val, sub) => `<div class="big"><div class="lab">${lab}</div><div class="val">${val}</div><div class="sub">${sub}</div></div>`;
+  const box = (lab, val, sub, how = "", ids = []) => `<div class="big"><div class="lab">${lab}${how ? ` <span class="info" tabindex="0" role="note" aria-label="${how.replace(/"/g, "&quot;")}" title="${how.replace(/"/g, "&quot;")}">ⓘ</span>` : ""}</div><div class="val">${val}</div><div class="sub">${sub}</div>${ids.length ? `<div class="src">Source: ${srcLinks(ids)}</div>` : ""}</div>`;
   $("cview").innerHTML = `
+  <div class="story">
+    <div><b>1 · The problem</b>In a conventional battery all cells are wired in one line. The weakest cell decides how much energy the battery gives and when it is replaced, and one failed cell stops all ${P.N}.</div>
+    <div><b>2 · What REON changes</b>REON senses and switches every cell. An empty cell steps aside while the rest keep going, and ${P.k} backup cells take over from any that fail.</div>
+    <div><b>3 · What it is worth</b>More usable energy, a longer-lasting battery and no single-cell outages, turned into dollars and CO₂ for a real Massachusetts customer below.</div>
+  </div>
   <div class="card"><h2>What REON's cell-level control is worth to ${sel ? `a ${sel.name.toLowerCase()}` : "this site"}</h2>
     <p class="cap">${n} × REON EBS (${n * 30} kW / ${kWh} kWh) behind the meter in Massachusetts, ${tariffName(P.dcRate)}, from ${P.startYear}. Compared with the same cells in a conventional battery whose weakest cell limits the whole string. Pick a customer:</p>
     <div class="pick">${CUSTOMERS.map(x => `<button type="button" data-c="${x.id}" aria-pressed="${sel && sel.id === x.id}" title="${x.blurb}">${x.name}</button>`).join("")}
       <button type="button" id="cvFail" aria-pressed="${fail && P.onFault === "retire"}" title="0.1% cell failures per year; a conventional block is replaced at its first cell failure">Include cell failures (REON's 2–3× case)</button></div>
     <p class="fine">${sel ? sel.blurb + ". " : ""}${fail ? `Cell failures on: ${P.faultPPM} ppm per cell-year, conventional block ${P.onFault === "retire" ? "replaced at its first failure" : "repaired (outage and visit)"}.` : "No sudden cell failures (aging only)."}</p></div>
   <div class="row">
-    ${box(`Extra value over ${P.horizon} years`, money(h.dNPV * n), `net present value, P10 ${money(h.dNPVp10 * n)} to P90 ${money(h.dNPVp90 * n)}; after REON's +${P.bmsOverhead}% BMS cost`)}
-    ${box("System cycle life", `${lifeC.toFixed(1)} y`, `vs ${lifeF.toFixed(1)} y conventional (+${(100 * (lifeC / lifeF - 1)).toFixed(0)}%) · about ${Math.round(cycC).toLocaleString()} vs ${Math.round(cycF).toLocaleString()} cycles`)}
-    ${box("Energy delivered per battery", `+${(100 * (c.mwh / f.mwh - 1)).toFixed(0)}%`, `${(c.mwh * n).toFixed(0)} vs ${(f.mwh * n).toFixed(0)} MWh over each battery's life`)}
-    ${box(`Batteries worn out over ${P.horizon} years`, (n * P.horizon / Math.max(lifeC, 0.1)).toFixed(1), `vs ${(n * P.horizon / Math.max(lifeF, 0.1)).toFixed(1)} conventional (block-lifetimes used up)`)}
+    ${box(`Extra value over ${P.horizon} years`, money(h.dNPV * n), `net present value, P10 ${money(h.dNPVp10 * n)} to P90 ${money(h.dNPVp90 * n)}; after REON's +${P.bmsOverhead}% BMS cost`, `REON minus conventional, over ${P.horizon} years, discounted at ${P.discount}%. Each design earns ConnectedSolutions, demand-charge savings and Clean Peak certificates from the energy it can actually deliver each year, pays O&M, and buys a new battery when the old one retires (at NREL's projected price and that year's tax credit). Average of ${P.packs} simulated batteries with identical cells in both designs; P10–P90 is the spread.`, ["evs", "cs", "cps", "atb", "nrel25", "itc"])}
+    ${box("System cycle life", `${lifeC.toFixed(1)} y`, `vs ${lifeF.toFixed(1)} y conventional (+${(100 * (lifeC / lifeF - 1)).toFixed(0)}%) · about ${Math.round(cycC).toLocaleString()} vs ${Math.round(cycF).toLocaleString()} cycles`, `Years until the battery can deliver less than ${P.retire}% of its nameplate energy. Cells age at different rates (calibrated on real per-cell data); a conventional battery hits the limit when its weakest cell does, REON when enough cells do. Cycles = years × ${P.cpy} a year.`, ["zhou", "zhoudata"])}
+    ${box("Energy delivered per battery", `+${(100 * (c.mwh / f.mwh - 1)).toFixed(0)}%`, `${(c.mwh * n).toFixed(0)} vs ${(f.mwh * n).toFixed(0)} MWh over each battery's life`, "Total energy the battery delivers before it retires. A conventional string stops every discharge when its weakest cell is empty; REON lets empty cells step aside (up to its backup count) so the rest keep discharging.", ["zhou"])}
+    ${box(`Batteries worn out over ${P.horizon} years`, (n * P.horizon / Math.max(lifeC, 0.1)).toFixed(1), `vs ${(n * P.horizon / Math.max(lifeF, 0.1)).toFixed(1)} conventional (block-lifetimes used up)`, `${n} batteries × ${P.horizon} years ÷ service life. Fewer worn-out batteries means fewer replacements bought and fewer cells manufactured.`)}
   </div>
   <div class="row">
-    ${box("Usable capacity at year 5", isFinite(retC) ? `${(100 * retC).toFixed(0)}%` : "–", `vs ${isFinite(retF) ? (100 * retF).toFixed(0) : "–"}% conventional: every cell discharges to its own limit, not the weakest one's`)}
-    ${box("Round-trip efficiency", `${rteC.toFixed(1)}%`, `vs ${P.rte.toFixed(1)}% conventional (assumed; REON's per-cell switches cost ${(100 - P.eff).toFixed(1)}%)`)}
-    ${box("Payback", `${h.cell.payback >= 98 ? "n/a" : h.cell.payback.toFixed(1) + " y"}`, `vs ${h.fixed.payback >= 98 ? "n/a" : h.fixed.payback.toFixed(1) + " y"} conventional, after the 30% ITC`)}
-    ${box("Chance one cell stops the battery", `${(100 * r10(ppmShown)).toFixed(0)}% → ~0%`, `over 10 years at ${ppmShown} ppm cell failures (${P.N} cells in series); REON keeps ${P.k} backup cells`)}
+    ${box("Usable capacity at year 5", isFinite(retC) ? `${(100 * retC).toFixed(0)}%` : "–", `vs ${isFinite(retF) ? (100 * retF).toFixed(0) : "–"}% conventional: every cell discharges to its own limit, not the weakest one's`, "Median usable energy at year 5 as a share of nameplate. This is the customer's real depth of discharge: how much of the battery they can actually use.", ["zhou"])}
+    ${box("Round-trip efficiency", `${rteC.toFixed(1)}%`, `vs ${P.rte.toFixed(1)}% conventional (assumed; REON's per-cell switches cost ${(100 - P.eff).toFixed(1)}%)`, "Assumed round-trip efficiency, reduced for REON by the conduction loss of its per-cell switches. REON says the loss is minimal but not zero; a 1 mΩ switch would cost about 3% and erase the value.", ["reon"])}
+    ${box("Payback", `${h.cell.payback >= 98 ? "n/a" : h.cell.payback.toFixed(1) + " y"}`, `vs ${h.fixed.payback >= 98 ? "n/a" : h.fixed.payback.toFixed(1) + " y"} conventional, after the 30% ITC`, `Years until cumulative savings repay the purchase (median). Before interconnection and aggregator fees, which are not included.`, ["evs", "cs", "itc"])}
+    ${box("Chance one cell stops the battery", `${(100 * r10(ppmShown)).toFixed(0)}% → ~0%`, `over 10 years at ${ppmShown} ppm cell failures (${P.N} cells in series); REON keeps ${P.k} backup cells`, `In a series string any one failed cell stops the battery: chance = 1 − (1 − rate)^(cells × 10 years). REON switches a failed cell out and only needs service after more than ${P.k} have failed (about 0 here). No public per-cell failure data exists, so the rate is an assumed range.`, ["epri", "recur"])}
   </div>
   <div class="row">
-    ${box("CO₂ avoided", `${co2.toFixed(1)} t`, `over ${P.horizon} years: extra clean energy delivered (ISO-NE average grid) plus batteries not manufactured`)}
-    ${box("Cells kept out of waste", `${(avoidKWh * P.cellKgPerKWh).toFixed(0)} kg`, `${avoidKWh.toFixed(0)} kWh of replacement batteries not built`)}
-    ${box(`${P.horizon}-year value, conventional`, money(h.fixed.npv * n), "present value of bill savings and program payments, minus purchases and O&amp;M")}
-    ${box(`${P.horizon}-year value, REON`, money(h.cell.npv * n), "same, with cell-level control")}
+    ${box("CO₂ avoided", `${co2.toFixed(1)} t`, `over ${P.horizon} years: extra clean energy delivered (ISO-NE average grid) plus batteries not manufactured`, `Extra energy delivered × ${P.gridCO2} lb CO₂/MWh (ISO-NE average; peak hours are dirtier, so this is conservative), plus batteries not built × ${P.embodiedCO2} kg CO₂e per kWh of cells.`, ["isone", "fraun"])}
+    ${box("Cells kept out of waste", `${(avoidKWh * P.cellKgPerKWh).toFixed(0)} kg`, `${avoidKWh.toFixed(0)} kWh of replacement batteries not built`, `Replacement battery capacity not needed over ${P.horizon} years × ${P.cellKgPerKWh} kg of cells per kWh (assumed).`)}
+    ${box(`${P.horizon}-year value, conventional`, money(h.fixed.npv * n), "present value of bill savings and program payments, minus purchases and O&amp;M", "The same 20-year calculation as the top-left card, for the conventional battery alone.", ["evs", "cs", "cps", "atb"])}
+    ${box(`${P.horizon}-year value, REON`, money(h.cell.npv * n), "same, with cell-level control", "The same 20-year calculation with REON's cell-level control, including its higher BMS cost.", ["evs", "cs", "cps", "atb", "reon"])}
   </div>
   <div class="card why"><h2>Why it pays</h2>
     <p>In a conventional battery every cell is wired in one line, so <b>the weakest cell decides how much energy the whole battery can give and when it must be replaced</b>, and <b>one failed cell stops all ${P.N}</b>. REON senses and switches each cell, so a cell that is empty steps aside while the others keep going, and ${P.k} backup cells take over from any that fail.</p>
     <p>For this customer that means more of the battery's energy is usable every day, the battery lasts longer before it needs replacing, and a single bad cell no longer means an outage. The money comes from Massachusetts demand-charge savings, ConnectedSolutions summer payments and Clean Peak certificates.</p>
-    <p class="fine">Model calibrated on real cell-to-cell aging data (Zhou et al., Nature Energy 2026); rates from Eversource's 2026 rate summary and Mass Save program materials; costs from NREL; failure rates are an assumed range. Open the Engineering view to change any assumption.</p></div>`;
+    <p class="fine">Model calibrated on real cell-to-cell aging data (Zhou et al., Nature Energy 2026); rates from Eversource's 2026 rate summary and Mass Save program materials; costs from NREL; failure rates are an assumed range. Open the Engineering view to change any assumption.</p></div>
+  ${sourcesCard()}`;
+  const es = document.getElementById("engSrc"); if (es) es.innerHTML = sourcesCard();
   $("cview").querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", () => setCustomer(CUSTOMERS.find(x => x.id === b.dataset.c))));
   $("cvFail").addEventListener("click", () => { const on = !(P.faultPPM > 0 && P.onFault === "retire"); Object.assign(P, on ? { faultPPM: 1000, onFault: "retire" } : { faultPPM: 0, onFault: "repair" }); buildControls(); changed(); });
 }
