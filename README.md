@@ -10,7 +10,7 @@ MIT Energy & Climate Hack 2026, REON challenge. Team: Isabell Luo (MIT), Annabel
 |---|---|
 | Lifetime energy and service life per battery | **+12.1% energy, +10.6% life** |
 | 20-year value gain (replacements at NREL-projected prices, NREL O&M, REON's +4% BMS cost, 50% demand-charge capture) | **+$4.3k** (P10 +$2.0k, P90 +$6.7k) |
-| With 0.1% cell failures per year and conventional blocks replaced at their first failure (REON's own 2–3× comparison) | **2.3× the energy and life, +$87k** |
+| With 0.1% cell failures per year and conventional blocks replaced at their first failure (an assumed scenario, in the range of REON's stated 2–3×; we do not know how REON measured theirs) | **2.3× the energy and life, +$87k** |
 | Customers: neighborhood grocer (G-1 demand option) / cold-storage warehouse (G-3, 10 blocks) | +$4.7k / +$20.7k |
 | Per 100 MW of C&I storage | +$7.2M, +19 GWh, 9.5 kt CO₂ avoided, 368 t of cells not made over 20 years |
 

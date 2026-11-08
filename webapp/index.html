@@ -771,7 +771,7 @@ function buildControls() {
   }
   const reset = document.createElement("button"); reset.type = "button"; reset.textContent = "Reset to defaults";
   reset.addEventListener("click", () => { P = clone(DEFAULTS); buildControls(); changed(); });
-  const best = document.createElement("button"); best.type = "button"; best.textContent = "Show REON's 2–3× case: 0.1% cell failures, base block retired at first failure";
+  const best = document.createElement("button"); best.type = "button"; best.textContent = "Show a failure scenario (REON states 2–3×): 0.1% cell failures, conventional block retired at first failure";
   best.addEventListener("click", () => { P = Object.assign(clone(DEFAULTS), { faultPPM: 1000, onFault: "retire" }); buildControls(); changed(); });
   const btns = document.createElement("div"); btns.style.cssText = "display:flex;flex-wrap:wrap;gap:8px"; btns.append(reset, best);
   rail.appendChild(btns);
@@ -1230,7 +1230,7 @@ function renderCustomer(cur) {
     <h2 style="margin-top:16px">Which scenario?</h2>
     <div class="scen" role="radiogroup" aria-label="Scenario">
       <button type="button" role="radio" data-sc="base" aria-checked="${!fail}"><span class="t">Base case</span><span class="d">Cells wear out at different speeds, as measured in real electric-vehicle batteries. No sudden cell failures. This is the number we can back with data.</span></button>
-      <button type="button" role="radio" data-sc="fail" aria-checked="${fail}"><span class="t">Cell failures included (REON's upside case)</span><span class="d">Also assumes 1 in 1,000 cells fails each year (an assumption; no public data) and a conventional battery is replaced whenever one cell fails. This is where REON's "2–3×" comes from.</span></button>
+      <button type="button" role="radio" data-sc="fail" aria-checked="${fail}"><span class="t">Cell failures included (upside case)</span><span class="d">Also assumes 1 in 1,000 cells fails each year (an assumption; no public data) and a conventional battery is replaced whenever one cell fails. In this scenario our model gives REON roughly 2× the energy and life, in the range of the 2–3× REON states. We don't know how REON measured theirs, so it is an upside, not a replication.</span></button>
     </div></div>
   <div class="verdict">
     <div><div class="k">Recommendation for ${sel ? `a ${sel.name.toLowerCase()}` : "this site"} <span class="chip">${fail ? "Cell failures included" : "Base case"}</span></div>

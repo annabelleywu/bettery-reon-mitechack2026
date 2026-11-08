@@ -16,7 +16,7 @@ Why this file exists: after meeting Tim Ren (REON CTO), we are adding the single
 | Cells | 20,000-cycle NFPP sodium cells; industry warranty 10 years / 8,000 cycles | Our aging is pessimistic for these cells (upside) |
 | Sensing | Within 5%, often much better; voltage and temperature (terminal and body) per cell, up to 100 Hz | 5% sensing barely changes the result |
 | Switch loss | "Very minimum overhead, but not none", depends on switch impedance | Kept at 0.5%; 1 mΩ switches would erase the gain (sensitivity) |
-| 2–3× | REON's own comparison of its system against a weakest-link base system | Our model reproduces this only when the base system is lost at its first cell failure (Section 3) |
+| 2–3× | REON's own comparison of its system against a weakest-link base system | Our model reaches this range only when the base system is lost at its first cell failure (Section 3). We do not know how REON measured it, so we do not claim to replicate it |
 | Single point of failure | Reliability of a series string falls as (0.999)^N | New: failures handled the way a real base system experiences them |
 | Customers | C&I, not residential; 60 kW is what customers prefer now; suburban sites, small businesses that value energy density; they care about cycle life, round-trip efficiency and depth of discharge | Customer view of the dashboard leads with these |
 | Mission | Power accessible; new technology into legacy systems; chemistry- and cell-agnostic | Pitch framing |
@@ -49,7 +49,7 @@ A hard cell failure here means the cell can no longer carry the string current s
 Two cases bracket reality, and the model now runs both:
 
 - **Repair:** the string is off until a technician replaces the failed cell or module. Our default outage is 14 days (assumed; parts lead time dominates). A truck roll costs "$250 or more for transportation and hours alone" for solar inverters [R9]; a battery module swap needs a qualified crew and parts, so we assume **$1,500 per visit** (placeholder; show $500–3,000). Replacing one module in an aged string also leaves a new, mismatched cell in an old string [R10].
-- **Retire:** the owner replaces the whole block at the first failure (for example, out of warranty, parts no longer available, or the repair does not pay). This is the worst case for the base system and the case behind REON's 2–3×.
+- **Retire:** the owner replaces the whole block at the first failure (for example, out of warranty, parts no longer available, or the repair does not pay). This is the worst case for the base system and the case that puts our model in the range of REON's stated 2–3× (we do not know how REON measured theirs).
 
 ## 4. Massachusetts grid reliability and outage cost
 
